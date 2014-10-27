@@ -326,10 +326,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           % write as
           %   phiP + h*JP*qdn >= 0 && -phiP - h*JP*qdn >= 0
           if (nargout<5)
-            [phiP,JP] = geval(@positionConstraints,obj.manip,q);
-            %        [phiP,JP] = obj.manip.positionConstraints(q);
+            [phiP,JP] = obj.manip.positionConstraints(q);
           else
-            [phiP,JP,dJP] = geval(@positionConstraints,obj.manip,q);
+            [phiP,JP,dJP] = obj.manip.positionConstraints(q);
             dJP(nL+(1:nP),:) = [dJP; -dJP];
           end
           phiP = [phiP;-phiP];
@@ -485,7 +484,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end
 
           inactive = ~active(1:(nL+nP+nC));  % only worry about the constraints that really matter.
-          missed = (M(inactive,inactive)*z(inactive)+w(inactive) < 0);
+          missed = (M(inactive,active)*z(active)+w(inactive) < 0);
           if ~any(missed), break; end
           % otherwise add the missed indices to the active set and repeat
           warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
