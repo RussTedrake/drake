@@ -30,13 +30,17 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
 
       if (~strcmp(options.hands, 'none'))
         if (strcmp(options.hands, 'robotiq'))
-          options.weld_to_link = 29;
           obj.hands = 1;
-          
-%           lhand = TimeSteppingRigidBodyManipulator([],options.dt);
-%           rhand = TimeSteppingRigidBodyManipulator([],options.dt);
-          obj = addRobotFromURDF(obj, getFullPathFromRelativePath('urdf/robotiq.urdf'), [0; -0.2; 0], [0; 0; 3.1415], options); 
+          options.weld_to_link = 29;
+          obj = addRobotFromURDF(obj, getFullPathFromRelativePath('urdf/robotiq.urdf'), [0; -0.2; 0], [0; 0; 3.1415], options);
+          %options.weld_to_link = 17;
+          % This won't work unless the various link and joint names
+          % get made with a unique prefix to differentiate l/r
+          %obj = addRobotFromURDF(obj, getFullPathFromRelativePath('urdf/robotiq.urdf'), [0; -0.2; 0], [0; 0; 3.1415], options);
           %obj = addRobotFromURDF(obj, getFullPathFromRelativePath('cylinder.urdf'), [0; -0.2; 0], [0; 0; 3.1415], options); 
+        elseif (strcmp(options.hands, 'robotiq_mass_only'))
+          options.weld_to_link = 29;
+          %obj = 
         else
           error('unsupported hand type'); 
         end
