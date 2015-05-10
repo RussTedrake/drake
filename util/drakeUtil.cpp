@@ -1,5 +1,5 @@
 /*
- * drakeUtil.cpp
+* drakeUtil.cpp
  *
  *  Created on: Jun 19, 2013
  *      Author: russt
@@ -75,7 +75,7 @@ mxArray* createDrakeMexPointer(void* ptr, const char* name, int num_additional_i
 
   int nrhs = 3 + num_additional_inputs;
   mxArray *plhs[1];
-  mxArray **prhs;  
+  mxArray **prhs;
   prhs = new mxArray*[nrhs];
 
   prhs[0] = mxCreateNumericMatrix(1, 1, cid, mxREAL);
@@ -120,14 +120,14 @@ void* getDrakeMexPointer(const mxArray* mx)
   if (!ptrArray)
     mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadInputs", "cannot retrieve 'ptr' field from this mxArray.  are you sure it's a valid DrakeMexPointer object?");
 
-  switch (sizeof(void*)) { 
+  switch (sizeof(void*)) {
     case 4:
       if (!mxIsUint32(ptrArray))
-        mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadPointerSize", "DrakeMexPointer expected a 32-bit ptr field but got something else");        
+        mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadPointerSize", "DrakeMexPointer expected a 32-bit ptr field but got something else");
       break;
     case 8:
       if (!mxIsUint64(ptrArray))
-        mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadPointerSize", "DrakeMexPointer expected a 64-bit ptr field but got something else");        
+        mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadPointerSize", "DrakeMexPointer expected a 64-bit ptr field but got something else");
       break;
     default:
       mexErrMsgIdAndTxt("Drake:getDrakeMexPointer:BadPointerSize", "DrakeMexPointer got a pointer that was neither 32-bit nor 64-bit.");
@@ -155,7 +155,8 @@ double angleAverage(double theta1, double theta2) {
   return angle_mean;
 }
 
-std::pair<Eigen::Vector3d, double> resolveCenterOfPressure(Eigen::Vector3d torque, Eigen::Vector3d force, Eigen::Vector3d normal, Eigen::Vector3d point_on_contact_plane)
+template <typename DerivedTorque, typename DerivedForce, typename DerivedNormal, typename DerivedPoint>
+std::pair<Eigen::Vector3d, double> resolveCenterOfPressure(const Eigen::MatrixBase<DerivedTorque> & torque, const Eigen::MatrixBase<DerivedForce> & force, const Eigen::MatrixBase<DerivedNormal> & normal, const Eigen::MatrixBase<DerivedPoint> & point_on_contact_plane)
 {
   // TODO: implement multi-column version
   using namespace Eigen;
@@ -259,7 +260,7 @@ void sizecheck(const mxArray* mat, int M, int N) {
 //builds a matlab sparse matrix in mex from a given eigen matrix
 //the caller is responsible for destroying the resulting array
 template <typename Derived>
-mxArray* eigenToMatlabSparse(MatrixBase<Derived> const & M, int & num_non_zero) 
+mxArray* eigenToMatlabSparse(MatrixBase<Derived> const & M, int & num_non_zero)
 {
   const mwSize rows = M.rows();
   const mwSize cols = M.cols();
@@ -274,7 +275,7 @@ mxArray* eigenToMatlabSparse(MatrixBase<Derived> const & M, int & num_non_zero)
   for (mwIndex j = 0; j < cols; j++) {
     for (mwIndex i = 0; i < rows; i++)  {
       double value = M(i, j);
-      
+
       if (value > eps || value < -eps) {
         ir.push_back(i);
         pr.push_back(value);
@@ -285,7 +286,7 @@ mxArray* eigenToMatlabSparse(MatrixBase<Derived> const & M, int & num_non_zero)
   }
 
   mxArray* sparse_mex = mxCreateSparse(rows, cols, cumulative_nonzero, mxREAL);
-  
+
   memcpy((double*)mxGetPr(sparse_mex), pr.data(), cumulative_nonzero * sizeof(double));
   memcpy((int*)mxGetIr(sparse_mex), ir.data(), cumulative_nonzero * sizeof(mwIndex));
   memcpy((int *)mxGetJc(sparse_mex), jc.data(), (cols + 1) * sizeof(mwIndex));
@@ -296,3 +297,5 @@ mxArray* eigenToMatlabSparse(MatrixBase<Derived> const & M, int & num_non_zero)
 
 template DLLEXPORT mxArray* eigenToMatlabSparse(MatrixBase< MatrixXd > const &, int &) ;
 template DLLEXPORT mxArray* eigenToMatlabSparse(MatrixBase< Map< MatrixXd> > const &, int &) ;
+template DLLEXPORT std::pair<Eigen::Matrix<double, 3, 1, 0, 3, 1>, double> resolveCenterOfPressure<Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> >, Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> >, Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> >, Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> > >(Eigen::MatrixBase<Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> > > const&, Eigen::MatrixBase<Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> > > const&, Eigen::MatrixBase<Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> > > const&, Eigen::MatrixBase<Eigen::Map<Eigen::Matrix<double, 3, 1, 0, 3, 1> const, 0, Eigen::Stride<0, 0> > > const&);
+template DLLEXPORT std::pair<Eigen::Matrix<double, 3, 1, 0, 3, 1>, double> resolveCenterOfPressure<Eigen::Matrix<double, 3, 1, 0, 3, 1>, Eigen::Matrix<double, 3, 1, 0, 3, 1>, Eigen::Matrix<double, 3, 1, 0, 3, 1>, Eigen::Matrix<double, 3, 1, 0, 3, 1> >(Eigen::MatrixBase<Eigen::Matrix<double, 3, 1, 0, 3, 1> > const&, Eigen::MatrixBase<Eigen::Matrix<double, 3, 1, 0, 3, 1> > const&, Eigen::MatrixBase<Eigen::Matrix<double, 3, 1, 0, 3, 1> > const&, Eigen::MatrixBase<Eigen::Matrix<double, 3, 1, 0, 3, 1> > const&);
