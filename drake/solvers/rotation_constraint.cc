@@ -321,10 +321,10 @@ std::vector<Eigen::Vector3d> ComputeBoxEdgesAndSphereIntersection(
     Eigen::Vector3d pt_closer, pt_farther;
     pt_closer(axis) = bmin(axis);
     pt_farther(axis) = bmax(axis);
-    std::array<double, 2> fixed_axis1_val = {bmin(fixed_axis1),
-                                             bmax(fixed_axis1)};
-    std::array<double, 2> fixed_axis2_val = {bmin(fixed_axis2),
-                                             bmax(fixed_axis2)};
+    std::array<double, 2> fixed_axis1_val = {{bmin(fixed_axis1),
+                                             bmax(fixed_axis1)}};
+    std::array<double, 2> fixed_axis2_val = {{bmin(fixed_axis2),
+                                             bmax(fixed_axis2)}};
     for (double val1 : fixed_axis1_val) {
       pt_closer(fixed_axis1) = val1;
       pt_farther(fixed_axis1) = pt_closer(fixed_axis1);
