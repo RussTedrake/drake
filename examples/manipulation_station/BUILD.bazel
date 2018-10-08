@@ -36,6 +36,22 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "manipulation_station_hardware_interface",
+    srcs = [
+        "manipulation_station_hardware_interface.cc",
+    ],
+    hdrs = [
+        "manipulation_station_hardware_interface.h",
+    ],
+    deps = [
+        "//examples/kuka_iiwa_arm:iiwa_lcm",
+        "//lcm",
+        "//systems/framework",
+        "//systems/lcm",
+    ],
+)
+
 drake_cc_binary(
     name = "proof_of_life",
     srcs = [
