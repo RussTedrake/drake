@@ -33,10 +33,14 @@ context = diagram.GetMutableSubsystemContext(station,
 q0 = [0, 0.6, 0, -1.0, 0, 1.0, 0]
 station.SetIiwaPosition(q0, context)
 station.SetIiwaVelocity(np.zeros(7), context)
+station.SetWsgState(0.05, 0, context)
 teleop.set(q0)
 
 context.FixInputPort(station.GetInputPort(
     "iiwa_feedforward_torque").get_index(), np.zeros(7))
+context.FixInputPort(station.GetInputPort("wsg_position").get_index(), [0.05])
+context.FixInputPort(station.GetInputPort("wsg_force_limit").get_index(),
+                     [40.0])
 
 simulator.set_target_realtime_rate(1.0)
 simulator.StepTo(np.inf)

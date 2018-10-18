@@ -50,7 +50,9 @@ PYBIND11_MODULE(manipulation_station, m) {
       .def("GetIiwaVelocity", &StationSimulation<T>::GetIiwaVelocity,
            doc.StationSimulation.GetIiwaVelocity.doc)
       .def("SetIiwaVelocity", &StationSimulation<T>::SetIiwaVelocity,
-           doc.StationSimulation.SetIiwaVelocity.doc);
+           doc.StationSimulation.SetIiwaVelocity.doc)
+      .def("SetWsgState", &StationSimulation<T>::SetWsgState,
+           doc.StationSimulation.SetWsgState.doc);
 }
 
 }  // namespace pydrake

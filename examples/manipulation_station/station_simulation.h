@@ -30,7 +30,9 @@ namespace manipulation_station {
 ///
 /// @system{ StationSimulation,
 ///   @input_port{iiwa_position}
-///   @input_port{iiwa_feedforward_torque},
+///   @input_port{iiwa_feedforward_torque}
+///   @input_port{wsg_position}
+///   @input_porT{wsg_force_limit},
 ///   @output_port{iiwa_position_commanded}
 ///   @output_port{iiwa_position_measured}
 ///   @output_port{iiwa_velocity_estimated}
@@ -38,6 +40,8 @@ namespace manipulation_station {
 ///   @output_port{iiwa_torque_commanded}
 ///   @output_port{iiwa_torque_measured}
 ///   @output_port{iiwa_torque_external}
+///   @output_port{wsg_state_measured}
+///   @output_port{wsg_force_measured}
 ///   @output_port{<b style="color:orange">pose_bundle</b>} }
 ///
 /// Note that outputs in <b style="color:orange">orange</b> are
@@ -164,6 +168,11 @@ class StationSimulation : public systems::Diagram<T> {
   /// IIWA. @v must have size num_iiwa_joints().
   void SetIiwaVelocity(const Eigen::Ref<const VectorX<T>>& v,
                          systems::Context<T>* station_context) const;
+
+  /// Convenience method for setting the position and velocity of the Schunk
+  /// WSG. Also sets the position history in the velocity interpolator.
+  void SetWsgState(const T& q, const T& v,
+                       systems::Context<T>* station_context) const;
 
   // TODO(russt): Implement SetIiwaPIDGains(...).
 
