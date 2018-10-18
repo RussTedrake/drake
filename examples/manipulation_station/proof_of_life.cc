@@ -1,5 +1,6 @@
 #include <gflags/gflags.h>
 
+#include "drake/common/eigen_types.h"
 #include "drake/common/is_approx_equal_abstol.h"
 #include "drake/examples/manipulation_station/station_simulation.h"
 #include "drake/geometry/geometry_visualization.h"
@@ -56,6 +57,13 @@ int do_main(int argc, char* argv[]) {
   context.FixInputPort(
       station->GetInputPort("iiwa_feedforward_torque").get_index(),
       VectorXd::Zero(7));
+
+  // Nominal WSG position is open.
+  context.FixInputPort(station->GetInputPort("wsg_position").get_index(),
+                       Vector1d(0.05));
+  // Force limit at 40N.
+  context.FixInputPort(station->GetInputPort("wsg_force_limit").get_index(),
+                       Vector1d(40.0));
 
   simulator.set_target_realtime_rate(FLAGS_target_realtime_rate);
   simulator.Initialize();

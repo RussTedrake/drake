@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "drake/common/find_resource.h"
+#include "drake/manipulation/schunk_wsg/schunk_wsg_position_controller.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
 #include "drake/multibody/multibody_tree/uniform_gravity_field_element.h"
@@ -14,6 +15,7 @@
 #include "drake/systems/primitives/constant_vector_source.h"
 #include "drake/systems/primitives/demultiplexer.h"
 #include "drake/systems/primitives/linear_system.h"
+#include "drake/systems/primitives/matrix_gain.h"
 #include "drake/systems/primitives/pass_through.h"
 
 namespace drake {
@@ -208,8 +210,8 @@ void StationSimulation<T>::Finalize() {
     builder.ExportOutput(demux->get_output_port(0), "iiwa_position_measured");
     builder.ExportOutput(demux->get_output_port(1), "iiwa_velocity_estimated");
 
-    builder.ExportOutput(plant_->get_continuous_state_output_port
-        (iiwa_model_), "iiwa_state_estimated");
+    builder.ExportOutput(plant_->get_continuous_state_output_port(iiwa_model_),
+                         "iiwa_state_estimated");
   }
 
   // Add the IIWA controller "stack".
@@ -270,14 +272,36 @@ void StationSimulation<T>::Finalize() {
     builder.ExportOutput(adder->get_output_port(), "iiwa_torque_measured");
   }
 
-  // TODO(russt): Add the WSG controller "stack".
   {
-    // For now, just send zero force inputs.
-    const auto wsg_command =
-        builder.template AddSystem<systems::ConstantVectorSource>(
-            Eigen::Vector2d::Zero());
-    builder.Connect(wsg_command->get_output_port(),
+    auto wsg_controller = builder.template AddSystem<
+        manipulation::schunk_wsg::SchunkWsgPositionController>();
+    wsg_controller->set_name("wsg_controller");
+
+    builder.Connect(wsg_controller->get_generalized_force_output_port(),
                     plant_->get_actuation_input_port(wsg_model_));
+    builder.Connect(plant_->get_continuous_state_output_port(wsg_model_),
+                    wsg_controller->get_state_input_port());
+
+    builder.ExportInput(wsg_controller->get_desired_position_input_port(),
+                        "wsg_position");
+    builder.ExportInput(wsg_controller->get_force_limit_input_port(),
+                        "wsg_force_limit");
+
+    // Extract the mean-finger position and velocity out of the plant model
+    // which pretends the two fingers are independent.
+    Eigen::Matrix<double, 2, 4> D;
+    // clang-format off
+    D << 0.5, -0.5, 0.0,  0.0,
+         0.0,  0.0, 0.5, -0.5;
+    // clang-format on
+    auto wsg_mean_state = builder.template AddSystem<systems::MatrixGain>(D);
+    builder.Connect(plant_->get_continuous_state_output_port(wsg_model_),
+                    wsg_mean_state->get_input_port());
+
+    builder.ExportOutput(wsg_mean_state->get_output_port(),
+                         "wsg_state_measured");
+    builder.ExportOutput(wsg_controller->get_grip_force_output_port(),
+                         "wsg_force_measured");
   }
 
   builder.ExportOutput(
@@ -351,6 +375,30 @@ void StationSimulation<T>::SetIiwaVelocity(
   plant_->tree()
       .get_mutable_multibody_state_vector(&plant_context)
       .template segment<7>(plant_->num_positions()) = v;
+}
+
+template <typename T>
+void StationSimulation<T>::SetWsgState(
+    const T& q, const T& v, drake::systems::Context<T>* station_context) const {
+  DRAKE_DEMAND(station_context != nullptr);
+  auto& plant_context =
+      this->GetMutableSubsystemContext(*plant_, station_context);
+  // This assumes that the WSG state comes last.  A unit test in
+  // station_simulation_test.cc validates this assumption.
+  // TODO(russt): update upon resolution of #9623.
+
+  auto state =
+      plant_->tree().get_mutable_multibody_state_vector(&plant_context);
+  state[7] = -q;
+  state[8] = q;
+  state[plant_->num_positions() + 7] = -v;
+  state[plant_->num_positions() + 8] = v;
+
+  // Set the position history in the state interpolator to match.
+  this->GetMutableSubsystemContext(this->GetSubsystemByName("wsg_controller"),
+                                   station_context)
+      .get_mutable_discrete_state_vector()
+      .SetAtIndex(0, q);
 }
 
 }  // namespace manipulation_station
