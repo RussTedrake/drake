@@ -140,7 +140,7 @@ StationSimulation<T>::StationSimulation(double time_step)
                      plant_->GetFrameByName("body", wsg_model_), wsg_pose);
 
   // Add a second table that is the main robot workspace.
-  const auto  table =
+  const auto table =
       AddModelFromSdfFile(table_sdf_path, "table", plant_, scene_graph_);
   plant_->WeldFrames(
       plant_->world_frame(), plant_->GetFrameByName("link", table),

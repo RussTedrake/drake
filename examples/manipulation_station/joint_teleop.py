@@ -5,6 +5,7 @@ directly tele-operating the joints.
 import Tkinter as tk
 import numpy as np
 
+from pydrake.common import FindResourceOrThrow
 from pydrake.examples.manipulation_station import StationSimulation
 from pydrake.geometry import ConnectDrakeVisualizer
 from pydrake.manipulation.simple_ui import JointSliders, SchunkWsgButtons
@@ -15,6 +16,10 @@ from pydrake.systems.analysis import Simulator
 builder = DiagramBuilder()
 
 station = builder.AddSystem(StationSimulation())
+
+print(FindResourceOrThrow("drake/tools/workspace/models_robotlocomotion"
+                          "/manipulation_station/station.sdf"))
+
 station.Finalize()
 
 teleop = builder.AddSystem(JointSliders(station.get_controller_plant()))
