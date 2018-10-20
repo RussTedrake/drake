@@ -110,8 +110,11 @@ StationSimulation<T>::StationSimulation(double time_step)
       "extra_heavy_duty_table_surface_only_collision.sdf");
   const auto robot_table =
       AddModelFromSdfFile(table_sdf_path, "robot_table", plant_, scene_graph_);
-  plant_->WeldFrames(plant_->world_frame(),
-                     plant_->GetFrameByName("link", robot_table));
+  const double table_top_z = 0.736 + 0.057 / 2;
+  plant_->WeldFrames(
+      plant_->world_frame(), plant_->GetFrameByName("link", robot_table),
+      RigidTransform<double>(Vector3d(0, 0, -table_top_z))
+          .GetAsIsometry3());
 
   // Add the Kuka IIWA.
   const std::string iiwa_sdf_path = FindResourceOrThrow(
@@ -119,11 +122,8 @@ StationSimulation<T>::StationSimulation(double time_step)
       "sdf/iiwa14_no_collision.sdf");
   iiwa_model_ =
       AddModelFromSdfFile(iiwa_sdf_path, "iiwa", plant_, scene_graph_);
-  const double table_top_z_in_world = 0.736 + 0.057 / 2;
-  plant_->WeldFrames(
-      plant_->world_frame(), plant_->GetFrameByName("iiwa_link_0", iiwa_model_),
-      RigidTransform<double>(Vector3d(0, 0, table_top_z_in_world))
-          .GetAsIsometry3());
+  plant_->WeldFrames(plant_->world_frame(),
+                     plant_->GetFrameByName("iiwa_link_0", iiwa_model_));
 
   // Add the Schunk gripper and weld it to the end of the IIWA.
   const std::string wsg_sdf_path = FindResourceOrThrow(
@@ -140,11 +140,11 @@ StationSimulation<T>::StationSimulation(double time_step)
                      plant_->GetFrameByName("body", wsg_model_), wsg_pose);
 
   // Add a second table that is the main robot workspace.
-  const auto table =
+  const auto  table =
       AddModelFromSdfFile(table_sdf_path, "table", plant_, scene_graph_);
   plant_->WeldFrames(
       plant_->world_frame(), plant_->GetFrameByName("link", table),
-      RigidTransform<double>(Vector3d(0.8, 0, 0.0)).GetAsIsometry3());
+      RigidTransform<double>(Vector3d(0.8, 0, -table_top_z)).GetAsIsometry3());
 
   plant_->template AddForceElement<multibody::UniformGravityFieldElement>(
       -9.81 * Vector3d::UnitZ());
