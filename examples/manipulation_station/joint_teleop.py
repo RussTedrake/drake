@@ -18,9 +18,14 @@ station = builder.AddSystem(StationSimulation())
 station.Finalize()
 
 teleop = builder.AddSystem(JointSliders(station.get_controller_plant()))
-wsg_buttons = builder.AddSystem(SchunkWsgButtons(teleop.window))
 builder.Connect(teleop.get_output_port(0), station.GetInputPort(
     "iiwa_position"))
+
+wsg_buttons = builder.AddSystem(SchunkWsgButtons(teleop.window))
+builder.Connect(wsg_buttons.GetOutputPort("position"), station.GetInputPort(
+    "wsg_position"))
+builder.Connect(wsg_buttons.GetOutputPort("force_limit"),
+                station.GetInputPort("wsg_force_limit"))
 
 ConnectDrakeVisualizer(builder, station.get_mutable_scene_graph(),
                        station.GetOutputPort("pose_bundle"))
@@ -39,9 +44,6 @@ teleop.set(q0)
 
 context.FixInputPort(station.GetInputPort(
     "iiwa_feedforward_torque").get_index(), np.zeros(7))
-context.FixInputPort(station.GetInputPort("wsg_position").get_index(), [0.05])
-context.FixInputPort(station.GetInputPort("wsg_force_limit").get_index(),
-                     [40.0])
 
 simulator.set_target_realtime_rate(1.0)
 simulator.StepTo(np.inf)
