@@ -21,6 +21,7 @@ drake_cc_library(
         "//examples/kuka_iiwa_arm/models",
         "//manipulation/models/iiwa_description:models",
         "//manipulation/models/wsg_50_description:models",
+        "@models_robotlocomotion//:models",
     ],
     visibility = ["//visibility:public"],
     deps = [
