@@ -2,7 +2,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/common/is_approx_equal_abstol.h"
-#include "drake/examples/manipulation_station/station_simulation.h"
+#include "drake/examples/manipulation_station/manipulation_station.h"
 #include "drake/geometry/geometry_visualization.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram.h"
@@ -31,7 +31,7 @@ int do_main(int argc, char* argv[]) {
   systems::DiagramBuilder<double> builder;
 
   // Create the "manipulation station".
-  auto station = builder.AddSystem<StationSimulation>();
+  auto station = builder.AddSystem<ManipulationStation>();
   station->Finalize();
 
   geometry::ConnectDrakeVisualizer(&builder, station->get_mutable_scene_graph(),

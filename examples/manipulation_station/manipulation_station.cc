@@ -1,4 +1,4 @@
-#include "drake/examples/manipulation_station/station_simulation.h"
+#include "drake/examples/manipulation_station/manipulation_station.h"
 
 #include <memory>
 #include <string>
@@ -98,7 +98,7 @@ SpatialInertia<double> MakeCompositeGripperInertia(
 }
 
 template <typename T>
-StationSimulation<T>::StationSimulation(double time_step)
+ManipulationStation<T>::ManipulationStation(double time_step)
     : owned_plant_(std::make_unique<MultibodyPlant<T>>(time_step)),
       owned_scene_graph_(std::make_unique<SceneGraph<T>>()),
       owned_controller_plant_(std::make_unique<MultibodyPlant<T>>()) {
@@ -175,7 +175,7 @@ StationSimulation<T>::StationSimulation(double time_step)
 }
 
 template <typename T>
-void StationSimulation<T>::AddCupboard() {
+void ManipulationStation<T>::AddCupboard() {
   const double dx_table_center_to_robot_base = 0.3257;
   const double dz_table_top_robot_base = 0.0127;
   const double dx_cupboard_to_table_center = 0.43 + 0.15;
@@ -198,7 +198,7 @@ void StationSimulation<T>::AddCupboard() {
 }
 
 template <typename T>
-void StationSimulation<T>::Finalize() {
+void ManipulationStation<T>::Finalize() {
   // Note: This deferred diagram construction method/workflow exists because we
   //   - cannot finalize plant until all of my objects are added, and
   //   - cannot wire up my diagram until we have finalized the plant.
@@ -336,7 +336,7 @@ void StationSimulation<T>::Finalize() {
 }
 
 template <typename T>
-VectorX<T> StationSimulation<T>::GetIiwaPosition(
+VectorX<T> ManipulationStation<T>::GetIiwaPosition(
     const systems::Context<T>& station_context) const {
   const auto& plant_context =
       this->GetSubsystemContext(*plant_, station_context);
@@ -352,7 +352,7 @@ VectorX<T> StationSimulation<T>::GetIiwaPosition(
 }
 
 template <typename T>
-void StationSimulation<T>::SetIiwaPosition(
+void ManipulationStation<T>::SetIiwaPosition(
     const Eigen::Ref<const drake::VectorX<T>>& q,
     drake::systems::Context<T>* station_context) const {
   DRAKE_DEMAND(station_context != nullptr);
@@ -376,7 +376,7 @@ void StationSimulation<T>::SetIiwaPosition(
 }
 
 template <typename T>
-VectorX<T> StationSimulation<T>::GetIiwaVelocity(
+VectorX<T> ManipulationStation<T>::GetIiwaVelocity(
     const systems::Context<T>& station_context) const {
   const auto& plant_context =
       this->GetSubsystemContext(*plant_, station_context);
@@ -392,7 +392,7 @@ VectorX<T> StationSimulation<T>::GetIiwaVelocity(
 }
 
 template <typename T>
-void StationSimulation<T>::SetIiwaVelocity(
+void ManipulationStation<T>::SetIiwaVelocity(
     const Eigen::Ref<const drake::VectorX<T>>& v,
     drake::systems::Context<T>* station_context) const {
   DRAKE_DEMAND(station_context != nullptr);
@@ -409,7 +409,7 @@ void StationSimulation<T>::SetIiwaVelocity(
 }
 
 template <typename T>
-void StationSimulation<T>::SetWsgState(
+void ManipulationStation<T>::SetWsgState(
     const T& q, const T& v, drake::systems::Context<T>* station_context) const {
   DRAKE_DEMAND(station_context != nullptr);
   auto& plant_context =
@@ -441,5 +441,5 @@ void StationSimulation<T>::SetWsgState(
 
 // TODO(russt): Support at least NONSYMBOLIC_SCALARS.  See #9573.
 //   (and don't forget to include default_scalars.h)
-template class ::drake::examples::manipulation_station::StationSimulation<
+template class ::drake::examples::manipulation_station::ManipulationStation<
     double>;

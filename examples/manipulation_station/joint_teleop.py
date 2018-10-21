@@ -6,7 +6,7 @@ import Tkinter as tk
 import numpy as np
 
 from pydrake.common import FindResourceOrThrow
-from pydrake.examples.manipulation_station import StationSimulation
+from pydrake.examples.manipulation_station import ManipulationStation
 from pydrake.geometry import ConnectDrakeVisualizer
 from pydrake.manipulation.simple_ui import JointSliders, SchunkWsgButtons
 from pydrake.multibody.multibody_tree.parsing import AddModelFromSdfFile
@@ -17,7 +17,7 @@ from pydrake.util.eigen_geometry import Isometry3
 
 builder = DiagramBuilder()
 
-station = builder.AddSystem(StationSimulation())
+station = builder.AddSystem(ManipulationStation())
 station.AddCupboard()
 object = AddModelFromSdfFile(FindResourceOrThrow(
     "drake/external/models_robotlocomotion/ycb_objects/apple.sdf"),

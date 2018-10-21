@@ -1,4 +1,4 @@
-#include "drake/examples/manipulation_station/station_simulation.h"
+#include "drake/examples/manipulation_station/manipulation_station.h"
 
 #include <gtest/gtest.h>
 
@@ -17,7 +17,7 @@ using systems::BasicVector;
 using multibody::RevoluteJoint;
 
 GTEST_TEST(SimulationStationTest, CheckPlantBasics) {
-  StationSimulation<double> station(0.001);
+  ManipulationStation<double> station(0.001);
   station.AddCupboard();
   multibody::parsing::AddModelFromSdfFile(
       FindResourceOrThrow(
@@ -102,7 +102,7 @@ GTEST_TEST(SimulationStationTest, CheckPlantBasics) {
 
 GTEST_TEST(SimulationStationTest, CheckStateFromPosition) {
   const double kTimeStep = 0.002;
-  StationSimulation<double> station(kTimeStep);
+  ManipulationStation<double> station(kTimeStep);
   station.Finalize();
 
   auto context = station.CreateDefaultContext();

@@ -100,14 +100,14 @@ namespace manipulation_station {
 /// @ingroup manipulation_station_systems
 /// @}
 template <typename T>
-class StationSimulation : public systems::Diagram<T> {
+class ManipulationStation : public systems::Diagram<T> {
  public:
-  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(StationSimulation)
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulationStation)
 
   /// Construct the station model with @p time_step as the time step used by
   /// MultibodyPlant<T>, and by the discrete derivative used to approximate
   /// velocity from the position command inputs.
-  explicit StationSimulation(double time_step = 0.002);
+  explicit ManipulationStation(double time_step = 0.002);
 
   /// Add the geometry (and two extra degrees-of-freedom) of the optional
   /// workstation cupboard to the model.
