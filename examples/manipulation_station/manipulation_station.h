@@ -82,8 +82,8 @@ namespace manipulation_station {
 /// @code
 /// StationSimulation<double> station;
 /// AddModelFromSdfFile("my.sdf", "my_model",
-///                     station.get_mutable_multibody_plant(),
-///                     station.get_mutable_scene_graph());
+///                     &station.get_mutable_multibody_plant(),
+///                     &station.get_mutable_scene_graph());
 /// ...
 /// // coming soon -- sugar API for adding additional objects.
 /// station.Finalize()

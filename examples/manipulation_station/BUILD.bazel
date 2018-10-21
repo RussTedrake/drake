@@ -52,6 +52,22 @@ drake_cc_binary(
     ],
 )
 
+drake_cc_binary(
+    name = "mock_station_simulation",
+    srcs = [
+        "mock_station_simulation.cc",
+    ],
+    add_test_rule = 1,
+    test_rule_args = ["--target_realtime_rate=0.0 --duration=0.5"],
+    deps = [
+        ":manipulation_station",
+        "//examples/kuka_iiwa_arm:iiwa_lcm",
+        "//geometry:geometry_visualization",
+        "//systems/analysis:simulator",
+        "@gflags",
+    ],
+)
+
 # Tests
 
 drake_cc_googletest(

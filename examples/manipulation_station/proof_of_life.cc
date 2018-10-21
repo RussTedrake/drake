@@ -44,8 +44,8 @@ int do_main(int argc, char* argv[]) {
       *station, &simulator.get_mutable_context());
 
   // Set initial conditions for the IIWA:
-  VectorXd q0 = VectorXd::Zero(7);
-  q0(1) = 0.3;
+  VectorXd q0(7);
+  q0 << 0, 0.6, 0, -1.75, 0, 1.0, 0;
   station->SetIiwaPosition(q0, &context);
   const VectorXd qdot0 = VectorXd::Zero(7);
   station->SetIiwaVelocity(qdot0, &context);
