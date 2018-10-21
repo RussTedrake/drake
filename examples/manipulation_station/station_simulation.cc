@@ -7,6 +7,7 @@
 #include "drake/common/find_resource.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_position_controller.h"
 #include "drake/math/rigid_transform.h"
+#include "drake/math/rotation_matrix.h"
 #include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
 #include "drake/multibody/multibody_tree/uniform_gravity_field_element.h"
 #include "drake/systems/controllers/inverse_dynamics_controller.h"
@@ -29,6 +30,7 @@ using Eigen::VectorXd;
 using geometry::SceneGraph;
 using math::RigidTransform;
 using math::RollPitchYaw;
+using math::RotationMatrix;
 using multibody::Joint;
 using multibody::SpatialInertia;
 using multibody::multibody_plant::MultibodyPlant;
@@ -104,16 +106,18 @@ StationSimulation<T>::StationSimulation(double time_step)
   plant_ = owned_plant_.get();
   scene_graph_ = owned_scene_graph_.get();
 
-  // Add a table for the robot.
+  // Add the table and 80/20 workcell frame.
+  const double dx_table_center_to_robot_base = 0.3257;
+  const double dz_table_top_robot_base = 0.0127;
   const std::string table_sdf_path = FindResourceOrThrow(
-      "drake/examples/kuka_iiwa_arm/models/table/"
-      "extra_heavy_duty_table_surface_only_collision.sdf");
-  const auto robot_table =
-      AddModelFromSdfFile(table_sdf_path, "robot_table", plant_, scene_graph_);
-  const double table_top_z = 0.736 + 0.057 / 2;
+      "drake/external/models_robotlocomotion/manipulation_station/"
+      "amazon_table_simplified.sdf");
+  const auto table =
+      AddModelFromSdfFile(table_sdf_path, "table", plant_, scene_graph_);
   plant_->WeldFrames(
-      plant_->world_frame(), plant_->GetFrameByName("link", robot_table),
-      RigidTransform<double>(Vector3d(0, 0, -table_top_z))
+      plant_->world_frame(), plant_->GetFrameByName("amazon_table", table),
+      RigidTransform<double>(
+          Vector3d(dx_table_center_to_robot_base, 0, -dz_table_top_robot_base))
           .GetAsIsometry3());
 
   // Add the Kuka IIWA.
@@ -138,13 +142,6 @@ StationSimulation<T>::StationSimulation(double time_step)
           .GetAsIsometry3();
   plant_->WeldFrames(plant_->GetFrameByName("iiwa_link_7", iiwa_model_),
                      plant_->GetFrameByName("body", wsg_model_), wsg_pose);
-
-  // Add a second table that is the main robot workspace.
-  const auto table =
-      AddModelFromSdfFile(table_sdf_path, "table", plant_, scene_graph_);
-  plant_->WeldFrames(
-      plant_->world_frame(), plant_->GetFrameByName("link", table),
-      RigidTransform<double>(Vector3d(0.8, 0, -table_top_z)).GetAsIsometry3());
 
   plant_->template AddForceElement<multibody::UniformGravityFieldElement>(
       -9.81 * Vector3d::UnitZ());
@@ -173,6 +170,29 @@ StationSimulation<T>::StationSimulation(double time_step)
   owned_controller_plant_
       ->template AddForceElement<multibody::UniformGravityFieldElement>(
           -9.81 * Vector3d::UnitZ());
+}
+
+template <typename T>
+void StationSimulation<T>::AddCupboard() {
+  const double dx_table_center_to_robot_base = 0.3257;
+  const double dz_table_top_robot_base = 0.0127;
+  const double dx_cupboard_to_table_center = 0.43 + 0.15;
+  const double dz_cupboard_to_table_center = 0.02;
+  const double cupboard_height = 0.815;
+
+  const std::string sdf_path = FindResourceOrThrow(
+      "drake/external/models_robotlocomotion/manipulation_station/"
+      "cupboard.sdf");
+  const auto cupboard =
+      AddModelFromSdfFile(sdf_path, "cupboard", plant_, scene_graph_);
+  plant_->WeldFrames(
+      plant_->world_frame(), plant_->GetFrameByName("cupboard_body", cupboard),
+      RigidTransform<double>(
+          RotationMatrix<double>::MakeZRotation(M_PI),
+          Vector3d(dx_table_center_to_robot_base + dx_cupboard_to_table_center,
+                   0, dz_cupboard_to_table_center + cupboard_height / 2.0 -
+                          dz_table_top_robot_base))
+          .GetAsIsometry3());
 }
 
 template <typename T>

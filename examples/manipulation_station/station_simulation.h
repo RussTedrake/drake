@@ -109,6 +109,10 @@ class StationSimulation : public systems::Diagram<T> {
   /// velocity from the position command inputs.
   explicit StationSimulation(double time_step = 0.002);
 
+  /// Add the geometry (and two extra degrees-of-freedom) of the optional
+  /// workstation cupboard to the model.
+  void AddCupboard();
+
   // TODO(russt): Add scalar copy constructor etc once we support more
   // scalar types than T=double.  See #9573.
 

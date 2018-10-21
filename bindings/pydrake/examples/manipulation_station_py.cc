@@ -29,6 +29,8 @@ PYBIND11_MODULE(manipulation_station, m) {
   py::class_<StationSimulation<T>, Diagram<T>>(m, "StationSimulation")
       .def(py::init<double>(), py::arg("time_step") = 0.002,
            doc.StationSimulation.ctor.doc_3)
+      .def("AddCupboard", &StationSimulation<T>::AddCupboard,
+          doc.StationSimulation.AddCupboard.doc)
       .def("Finalize", &StationSimulation<T>::Finalize,
            doc.StationSimulation.Finalize.doc)
       .def("get_mutable_multibody_plant",
