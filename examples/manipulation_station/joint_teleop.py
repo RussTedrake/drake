@@ -9,17 +9,19 @@ from pydrake.common import FindResourceOrThrow
 from pydrake.examples.manipulation_station import StationSimulation
 from pydrake.geometry import ConnectDrakeVisualizer
 from pydrake.manipulation.simple_ui import JointSliders, SchunkWsgButtons
+from pydrake.multibody.multibody_tree.parsing import AddModelFromSdfFile
 from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.analysis import Simulator
-
+from pydrake.util.eigen_geometry import Isometry3
 
 builder = DiagramBuilder()
 
 station = builder.AddSystem(StationSimulation())
-
-print(FindResourceOrThrow("drake/tools/workspace/models_robotlocomotion"
-                          "/manipulation_station/station.sdf"))
-
+object = AddModelFromSdfFile(FindResourceOrThrow(
+    "drake/external/models_robotlocomotion/ycb_objects/apple.sdf"),
+                           "object",
+                           station.get_mutable_multibody_plant(),
+ station.get_mutable_scene_graph() )
 station.Finalize()
 
 teleop = builder.AddSystem(JointSliders(station.get_controller_plant()))
@@ -46,6 +48,13 @@ station.SetIiwaPosition(q0, context)
 station.SetIiwaVelocity(np.zeros(7), context)
 station.SetWsgState(0.05, 0, context)
 teleop.set(q0)
+X_WObject = Isometry3.Identity()
+X_WObject.set_translation([.6, 0, 0])
+station.get_mutable_multibody_plant().tree().SetFreeBodyPoseOrThrow(
+    station.get_mutable_multibody_plant().GetBodyByName("base_link_apple",
+                                                       object), X_WObject,
+    station.GetMutableSubsystemContext(station.get_mutable_multibody_plant(),
+        context))
 
 context.FixInputPort(station.GetInputPort(
     "iiwa_feedforward_torque").get_index(), np.zeros(7))
