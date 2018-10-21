@@ -174,6 +174,9 @@ class StationSimulation : public systems::Diagram<T> {
   void SetWsgState(const T& q, const T& v,
                        systems::Context<T>* station_context) const;
 
+  // TODO(russt): Implement SetFreeBodyPose(model_instance, pose, &context)
+  // once I have an API for finding the base joint of a model instance.
+
   // TODO(russt): Implement SetIiwaPIDGains(...).
 
  private:

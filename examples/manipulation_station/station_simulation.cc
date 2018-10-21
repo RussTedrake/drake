@@ -8,6 +8,7 @@
 #include "drake/manipulation/schunk_wsg/schunk_wsg_position_controller.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/math/rotation_matrix.h"
+#include "drake/multibody/multibody_tree/joints/revolute_joint.h"
 #include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
 #include "drake/multibody/multibody_tree/uniform_gravity_field_element.h"
 #include "drake/systems/controllers/inverse_dynamics_controller.h"
@@ -32,6 +33,7 @@ using math::RigidTransform;
 using math::RollPitchYaw;
 using math::RotationMatrix;
 using multibody::Joint;
+using multibody::RevoluteJoint;
 using multibody::SpatialInertia;
 using multibody::multibody_plant::MultibodyPlant;
 using multibody::parsing::AddModelFromSdfFile;
@@ -336,13 +338,17 @@ void StationSimulation<T>::Finalize() {
 template <typename T>
 VectorX<T> StationSimulation<T>::GetIiwaPosition(
     const systems::Context<T>& station_context) const {
-  auto& plant_context = this->GetSubsystemContext(*plant_, station_context);
-  // This assumes that the IIWA state comes first.  A unit test in
-  // station_simulation_test.cc validates this assumption.
+  const auto& plant_context =
+      this->GetSubsystemContext(*plant_, station_context);
   // TODO(russt): update upon resolution of #9623.
-  return plant_->tree()
-      .get_multibody_state_vector(plant_context)
-      .template segment<7>(0);
+  VectorX<T> q(7);
+  for (int i = 0; i < 7; i++) {
+    q(i) = plant_
+               ->template GetJointByName<RevoluteJoint>("iiwa_joint_" +
+                                                        std::to_string(i + 1))
+               .get_angle(plant_context);
+  }
+  return q;
 }
 
 template <typename T>
@@ -353,12 +359,13 @@ void StationSimulation<T>::SetIiwaPosition(
   DRAKE_DEMAND(q.size() == 7);
   auto& plant_context =
       this->GetMutableSubsystemContext(*plant_, station_context);
-  // This assumes that the IIWA state comes first.  A unit test in
-  // station_simulation_test.cc validates this assumption.
   // TODO(russt): update upon resolution of #9623.
-  plant_->tree()
-      .get_mutable_multibody_state_vector(&plant_context)
-      .template segment<7>(0) = q;
+  for (int i = 0; i < 7; i++) {
+    plant_
+        ->template GetJointByName<RevoluteJoint>("iiwa_joint_" +
+                                                 std::to_string(i + 1))
+        .set_angle(&plant_context, q(i));
+  }
 
   // Set the position history in the state interpolator to match.
   this->GetMutableSubsystemContext(
@@ -371,14 +378,17 @@ void StationSimulation<T>::SetIiwaPosition(
 template <typename T>
 VectorX<T> StationSimulation<T>::GetIiwaVelocity(
     const systems::Context<T>& station_context) const {
-  auto& plant_context = this->GetSubsystemContext(*plant_, station_context);
-  // This assumes that the IIWA state comes first, and that velocities follow
-  // positions.  A unit test in station_simulation_test.cc validates this
-  // assumption.
+  const auto& plant_context =
+      this->GetSubsystemContext(*plant_, station_context);
+  VectorX<T> v(7);
   // TODO(russt): update upon resolution of #9623.
-  return plant_->tree()
-      .get_multibody_state_vector(plant_context)
-      .template segment<7>(plant_->num_positions());
+  for (int i = 0; i < 7; i++) {
+    v(i) = plant_
+               ->template GetJointByName<RevoluteJoint>("iiwa_joint_" +
+                                                        std::to_string(i + 1))
+               .get_angular_rate(plant_context);
+  }
+  return v;
 }
 
 template <typename T>
@@ -389,12 +399,13 @@ void StationSimulation<T>::SetIiwaVelocity(
   DRAKE_DEMAND(v.size() == 7);
   auto& plant_context =
       this->GetMutableSubsystemContext(*plant_, station_context);
-  // This assumes that the IIWA state comes first.  A unit test in
-  // station_simulation_test.cc validates this assumption.
   // TODO(russt): update upon resolution of #9623.
-  plant_->tree()
-      .get_mutable_multibody_state_vector(&plant_context)
-      .template segment<7>(plant_->num_positions()) = v;
+  for (int i = 0; i < 7; i++) {
+    plant_
+        ->template GetJointByName<RevoluteJoint>("iiwa_joint_" +
+                                                 std::to_string(i + 1))
+        .set_angular_rate(&plant_context, v(i));
+  }
 }
 
 template <typename T>
@@ -403,16 +414,19 @@ void StationSimulation<T>::SetWsgState(
   DRAKE_DEMAND(station_context != nullptr);
   auto& plant_context =
       this->GetMutableSubsystemContext(*plant_, station_context);
-  // This assumes that the WSG state comes last.  A unit test in
-  // station_simulation_test.cc validates this assumption.
-  // TODO(russt): update upon resolution of #9623.
 
+  // TODO(russt): update upon resolution of #9623.
   auto state =
       plant_->tree().get_mutable_multibody_state_vector(&plant_context);
-  state[7] = -q;
-  state[8] = q;
-  state[plant_->num_positions() + 7] = -v;
-  state[plant_->num_positions() + 8] = v;
+  const Joint<T>& left_finger =
+      plant_->GetJointByName("left_finger_sliding_joint", wsg_model_);
+  const Joint<T>& right_finger =
+      plant_->GetJointByName("right_finger_sliding_joint", wsg_model_);
+
+  state[left_finger.position_start()] = -q;
+  state[right_finger.position_start()] = q;
+  state[plant_->num_positions() + left_finger.velocity_start()] = -v;
+  state[plant_->num_positions() + right_finger.velocity_start()] = v;
 
   // Set the position history in the state interpolator to match.
   this->GetMutableSubsystemContext(this->GetSubsystemByName("wsg_controller"),

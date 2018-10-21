@@ -14,6 +14,7 @@ from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.analysis import Simulator
 from pydrake.util.eigen_geometry import Isometry3
 
+
 builder = DiagramBuilder()
 
 station = builder.AddSystem(StationSimulation())
@@ -44,7 +45,7 @@ simulator = Simulator(diagram)
 context = diagram.GetMutableSubsystemContext(station,
                                              simulator.get_mutable_context())
 
-q0 = [0, 0.6, 0, -1.0, 0, 1.0, 0]
+q0 = [0, 0.6, 0, -1.75, 0, 1.0, 0]
 station.SetIiwaPosition(q0, context)
 station.SetIiwaVelocity(np.zeros(7), context)
 station.SetWsgState(0.05, 0, context)
