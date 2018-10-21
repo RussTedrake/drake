@@ -17,6 +17,7 @@ from pydrake.util.eigen_geometry import Isometry3
 builder = DiagramBuilder()
 
 station = builder.AddSystem(StationSimulation())
+station.AddCupboard()
 object = AddModelFromSdfFile(FindResourceOrThrow(
     "drake/external/models_robotlocomotion/ycb_objects/apple.sdf"),
                            "object",
