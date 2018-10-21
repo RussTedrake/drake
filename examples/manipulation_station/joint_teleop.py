@@ -15,6 +15,16 @@ from pydrake.systems.analysis import Simulator
 from pydrake.util.eigen_geometry import Isometry3
 
 
+def RenderSystemWithGraphviz(system, output_file="system_view.gz"):
+    ''' Renders the Drake system (presumably a diagram,
+    otherwise this graph will be fairly trivial) using
+    graphviz to a specified file. '''
+    from graphviz import Source
+    string = system.GetGraphvizString()
+    src = Source(string)
+    src.render(output_file, view=False)
+
+
 builder = DiagramBuilder()
 
 station = builder.AddSystem(StationSimulation())
@@ -40,10 +50,16 @@ ConnectDrakeVisualizer(builder, station.get_mutable_scene_graph(),
                        station.GetOutputPort("pose_bundle"))
 
 diagram = builder.Build()
+RenderSystemWithGraphviz(diagram)
 simulator = Simulator(diagram)
 
 context = diagram.GetMutableSubsystemContext(station,
                                              simulator.get_mutable_context())
+plant = station.get_mutable_multibody_plant()
+context_plant = station.GetMutableSubsystemContext(plant, context)
+context_plant.FixInputPort(
+    plant.GetInputPort("cupboard_actuation").get_index(),
+    np.zeros(2))
 
 q0 = [0, 0.6, 0, -1.75, 0, 1.0, 0]
 station.SetIiwaPosition(q0, context)

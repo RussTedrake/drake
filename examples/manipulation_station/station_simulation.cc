@@ -123,9 +123,12 @@ StationSimulation<T>::StationSimulation(double time_step)
           .GetAsIsometry3());
 
   // Add the Kuka IIWA.
+//  const std::string iiwa_sdf_path = FindResourceOrThrow(
+//      "drake/manipulation/models/iiwa_description/"
+//      "sdf/iiwa14_no_collision.sdf");
+
   const std::string iiwa_sdf_path = FindResourceOrThrow(
-      "drake/manipulation/models/iiwa_description/"
-      "sdf/iiwa14_no_collision.sdf");
+      "drake/external/models_robotlocomotion/iiwa7/iiwa7_no_collision.sdf");
   iiwa_model_ =
       AddModelFromSdfFile(iiwa_sdf_path, "iiwa", plant_, scene_graph_);
   plant_->WeldFrames(plant_->world_frame(),
