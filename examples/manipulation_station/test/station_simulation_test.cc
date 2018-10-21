@@ -2,8 +2,10 @@
 
 #include <gtest/gtest.h>
 
+#include "drake/common/find_resource.h"
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
 #include "drake/multibody/multibody_tree/joints/revolute_joint.h"
+#include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
 
 namespace drake {
 namespace examples {
@@ -16,6 +18,12 @@ using multibody::RevoluteJoint;
 
 GTEST_TEST(SimulationStationTest, CheckPlantBasics) {
   StationSimulation<double> station(0.001);
+  station.AddCupboard();
+  multibody::parsing::AddModelFromSdfFile(
+      FindResourceOrThrow(
+          "drake/external/models_robotlocomotion/ycb_objects/apple.sdf"),
+      "object", &station.get_mutable_multibody_plant(),
+      &station.get_mutable_scene_graph());
   station.Finalize();
 
   auto& plant = station.get_mutable_multibody_plant();
@@ -99,8 +107,9 @@ GTEST_TEST(SimulationStationTest, CheckStateFromPosition) {
 
   auto context = station.CreateDefaultContext();
 
-  // Expect state from the desired_state_from_position and from the plant.
-  EXPECT_EQ(context->get_num_discrete_state_groups(), 2);
+  // Expect state from the velocity interpolators in the iiwa and the wsg and
+  // from the multibody state of the plant.
+  EXPECT_EQ(context->get_num_discrete_state_groups(), 3);
 
   // The tests below expect desired_state_from_position to be the second
   // state.  Verify this by checking the sizes.
@@ -120,6 +129,10 @@ GTEST_TEST(SimulationStationTest, CheckStateFromPosition) {
   context->FixInputPort(
       station.GetInputPort("iiwa_feedforward_torque").get_index(),
       VectorXd::Zero(7));
+  context->FixInputPort(station.GetInputPort("wsg_position").get_index(),
+                        Vector1d(0.05));
+  context->FixInputPort(station.GetInputPort("wsg_force_limit").get_index(),
+                        Vector1d(40));
   context->get_mutable_discrete_state(plant_index).SetZero();
   context->get_mutable_discrete_state(state_from_position_index).SetZero();
 
