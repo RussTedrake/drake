@@ -58,6 +58,7 @@ int do_main(int argc, char* argv[]) {
                                    station->GetOutputPort("pose_bundle"));
 
   lcm::DrakeLcm lcm;
+  lcm.StartReceiveThread();
 
   // TODO(russt): IiwaCommandReceiver should output positions, not
   // state.  (We are adding delay twice in this current implementation).
