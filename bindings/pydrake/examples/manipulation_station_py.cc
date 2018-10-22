@@ -4,6 +4,7 @@
 #include "drake/bindings/pydrake/documentation_pybind.h"
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/examples/manipulation_station/manipulation_station.h"
+#include "drake/examples/manipulation_station/manipulation_station_hardware_interface.h" // noqa
 
 using std::make_unique;
 using std::unique_ptr;
@@ -30,7 +31,7 @@ PYBIND11_MODULE(manipulation_station, m) {
       .def(py::init<double>(), py::arg("time_step") = 0.002,
            doc.ManipulationStation.ctor.doc_3)
       .def("AddCupboard", &ManipulationStation<T>::AddCupboard,
-          doc.ManipulationStation.AddCupboard.doc)
+           doc.ManipulationStation.AddCupboard.doc)
       .def("Finalize", &ManipulationStation<T>::Finalize,
            doc.ManipulationStation.Finalize.doc)
       .def("get_mutable_multibody_plant",
@@ -42,8 +43,7 @@ PYBIND11_MODULE(manipulation_station, m) {
            py_reference_internal,
            doc.ManipulationStation.get_mutable_scene_graph.doc)
       .def("get_controller_plant",
-           &ManipulationStation<T>::get_controller_plant,
-           py_reference_internal,
+           &ManipulationStation<T>::get_controller_plant, py_reference_internal,
            doc.ManipulationStation.get_controller_plant.doc)
       .def("GetIiwaPosition", &ManipulationStation<T>::GetIiwaPosition,
            doc.ManipulationStation.GetIiwaPosition.doc)
@@ -55,6 +55,10 @@ PYBIND11_MODULE(manipulation_station, m) {
            doc.ManipulationStation.SetIiwaVelocity.doc)
       .def("SetWsgState", &ManipulationStation<T>::SetWsgState,
            doc.ManipulationStation.SetWsgState.doc);
+
+  m.def("MakeManipulationStationHardwareInterface",
+        &MakeManipulationStationHardwareInterface, py::arg("lcm") = nullptr,
+        doc.MakeManipulationStationHardwareInterface.doc);
 }
 
 }  // namespace pydrake
