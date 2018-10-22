@@ -18,8 +18,6 @@ drake_cc_library(
         "manipulation_station.h",
     ],
     data = [
-        "//examples/kuka_iiwa_arm:models",
-        "//manipulation/models/iiwa_description:models",
         "//manipulation/models/wsg_50_description:models",
         "@models_robotlocomotion//:models",
     ],
@@ -44,12 +42,20 @@ drake_cc_library(
     hdrs = [
         "manipulation_station_hardware_interface.h",
     ],
+    data = [
+        "//manipulation/models/wsg_50_description:models",
+        "@models_robotlocomotion//:models",
+    ],
     visibility = ["//visibility:public"],
     deps = [
+        "//common:find_resource",
         "//examples/kuka_iiwa_arm:iiwa_lcm",
         "//lcm",
+        "//multibody/multibody_tree/multibody_plant",
+        "//multibody/multibody_tree/parsing:multibody_plant_sdf_parser",
         "//systems/framework",
         "//systems/lcm",
+        "//systems/primitives",
     ],
 )
 

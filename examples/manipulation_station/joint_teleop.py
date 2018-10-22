@@ -9,7 +9,7 @@ import numpy as np
 
 from pydrake.common import FindResourceOrThrow
 from pydrake.examples.manipulation_station import ( ManipulationStation,
-                                                    MakeManipulationStationHardwareInterface )
+                                                    ManipulationStationHardwareInterface )
 from pydrake.geometry import ConnectDrakeVisualizer
 from pydrake.manipulation.simple_ui import JointSliders, SchunkWsgButtons
 from pydrake.multibody.multibody_tree.parsing import AddModelFromSdfFile
@@ -35,7 +35,7 @@ args = parser.parse_args()
 builder = DiagramBuilder()
 
 if args.hardware:
-    station = builder.AddSystem(MakeManipulationStationHardwareInterface())
+    station = builder.AddSystem(ManipulationStationHardwareInterface())
 else:
     station = builder.AddSystem(ManipulationStation())
     station.AddCupboard()
@@ -62,15 +62,14 @@ builder.Connect(wsg_buttons.GetOutputPort("force_limit"),
 diagram = builder.Build()
 simulator = Simulator(diagram)
 
+context = diagram.GetMutableSubsystemContext(station,
+                                             simulator.get_mutable_context())
 if args.hardware:
     # TODO(russt): read the status port once and set the teleop state before
     # sending any commands.
     print("todo")
 else:
     # Set up the context for the simulator:
-    context = diagram.GetMutableSubsystemContext(station,
-                                                 simulator.get_mutable_context())
-
     q0 = [0, 0.6, 0, -1.75, 0, 1.0, 0]
     station.SetIiwaPosition(q0, context)
     station.SetIiwaVelocity(np.zeros(7), context)

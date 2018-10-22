@@ -4,7 +4,7 @@
 #include "drake/bindings/pydrake/documentation_pybind.h"
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/examples/manipulation_station/manipulation_station.h"
-#include "drake/examples/manipulation_station/manipulation_station_hardware_interface.h" // noqa
+#include "drake/examples/manipulation_station/manipulation_station_hardware_interface.h"  // noqa
 
 using std::make_unique;
 using std::unique_ptr;
@@ -56,9 +56,14 @@ PYBIND11_MODULE(manipulation_station, m) {
       .def("SetWsgState", &ManipulationStation<T>::SetWsgState,
            doc.ManipulationStation.SetWsgState.doc);
 
-  m.def("MakeManipulationStationHardwareInterface",
-        &MakeManipulationStationHardwareInterface, py::arg("lcm") = nullptr,
-        doc.MakeManipulationStationHardwareInterface.doc);
+  py::class_<ManipulationStationHardwareInterface, Diagram<double>>(
+      m, "ManipulationStationHardwareInterface")
+      .def(py::init<lcm::DrakeLcmInterface*>(), py::arg("lcm") = nullptr,
+           doc.ManipulationStationHardwareInterface.ctor.doc_3)
+      .def("get_controller_plant",
+           &ManipulationStationHardwareInterface::get_controller_plant,
+           py_reference_internal, doc.ManipulationStationHardwareInterface
+                                      .get_controller_plant.doc);
 }
 
 }  // namespace pydrake

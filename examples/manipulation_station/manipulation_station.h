@@ -99,6 +99,9 @@ namespace manipulation_station {
 ///
 /// @ingroup manipulation_station_systems
 /// @}
+// TODO(russt): Add a geometry_pose output -- analagous to the
+// ManipulationStationHardwareInterface, that supports having an external
+// SceneGraph (for the estimated state).
 template <typename T>
 class ManipulationStation : public systems::Diagram<T> {
  public:
