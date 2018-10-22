@@ -6,9 +6,9 @@
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
 #include "drake/systems/framework/diagram_builder.h"
-#include "drake/systems/primitives/pass_through.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
+#include "drake/systems/primitives/pass_through.h"
 
 namespace drake {
 namespace examples {
@@ -80,7 +80,8 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
   // Build the controller's version of the plant, which only contains the
   // IIWA and the equivalent inertia of the gripper.
   const std::string iiwa_sdf_path = FindResourceOrThrow(
-      "drake/external/models_robotlocomotion/iiwa7/iiwa7_no_collision.sdf");
+      "drake/manipulation/models/iiwa_description/sdf/iiwa14_no_collision.sdf");
+  //      "drake/external/models_robotlocomotion/iiwa7/iiwa7_no_collision.sdf");
   const auto controller_iiwa_model =
       AddModelFromSdfFile(iiwa_sdf_path, "iiwa", owned_controller_plant_.get());
   owned_controller_plant_->WeldFrames(owned_controller_plant_->world_frame(),
@@ -91,7 +92,6 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
       ->template AddForceElement<multibody::UniformGravityFieldElement>(
           -9.81 * Vector3d::UnitZ());
   owned_controller_plant_->Finalize();
-
 }
 
 }  // namespace manipulation_station
