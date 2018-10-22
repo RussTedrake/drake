@@ -63,7 +63,9 @@ drake_cc_binary(
         ":manipulation_station",
         "//examples/kuka_iiwa_arm:iiwa_lcm",
         "//geometry:geometry_visualization",
+        "//lcm",
         "//systems/analysis:simulator",
+        "//systems/lcm",
         "@gflags",
     ],
 )
