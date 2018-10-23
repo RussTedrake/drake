@@ -125,6 +125,42 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "lcm_image_array_to_images",
+    srcs = [
+        "lcm_image_array_to_images.cc",
+    ],
+    hdrs = [
+        "lcm_image_array_to_images.h",
+    ],
+    deps = [
+        ":image",
+        "//common:essential",
+        "//systems/framework",
+        "@lcmtypes_robotlocomotion",
+        "@vtk//:vtkIOImage",
+        "@zlib",
+    ],
+)
+
+drake_cc_binary(
+    name = "lcm_image_array_receive_example",
+    srcs = [
+        "lcm_image_array_receive_example.cc",
+    ],
+    deps = [
+        ":image_to_lcm_image_array_t",
+        ":lcm_image_array_to_images",
+        "//common:text_logging_gflags",
+        "//common:unused",
+        "//lcm",
+        "//systems/analysis:simulator",
+        "//systems/lcm:lcm_pubsub_system",
+        "@gflags",
+    ],
+)
+
+
+drake_cc_library(
     name = "depth_sensor",
     srcs = [
         "depth_sensor.cc",
