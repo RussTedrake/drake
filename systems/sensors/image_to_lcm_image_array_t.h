@@ -18,7 +18,7 @@ namespace sensors {
 /// ImageLabel16I. This system outputs an AbstractValue containing a
 /// `Value<robotlocomotion::image_array_t>` LCM message that defines an array
 /// of images (image_t). This message can then be sent to other processes that
-/// sbscribe it using LcmPublisherSystem. Note that you should NOT assume any
+/// subscribe it using LcmPublisherSystem. Note that you should NOT assume any
 /// particular order of those images stored in robotlocomotion::image_array_t,
 /// instead check the semantic of those images with
 /// robotlocomotion::image_t::pixel_format before using them.

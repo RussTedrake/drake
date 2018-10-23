@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "drake/common/find_resource.h"
+#include "drake/geometry/dev/scene_graph.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_position_controller.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/math/rotation_matrix.h"
@@ -19,6 +20,7 @@
 #include "drake/systems/primitives/linear_system.h"
 #include "drake/systems/primitives/matrix_gain.h"
 #include "drake/systems/primitives/pass_through.h"
+#include "drake/systems/sensors/dev/rgbd_camera.h"
 
 namespace drake {
 namespace examples {
@@ -328,6 +330,34 @@ void ManipulationStation<T>::Finalize() {
   builder.ExportOutput(
       plant_->get_generalized_contact_forces_output_port(iiwa_model_),
       "iiwa_torque_external");
+
+  {  // RGB-D Cameras
+    auto render_scene_graph =
+        builder.template AddSystem<geometry::dev::SceneGraph>(*scene_graph_);
+
+    builder.Connect(plant_->get_geometry_poses_output_port(),
+                    render_scene_graph->get_source_pose_port(
+                        plant_->get_source_id().value()));
+
+    // Create the first camera.
+    geometry::dev::render::DepthCameraProperties camera_properties(
+        640, 480, M_PI_4, geometry::dev::render::Fidelity::kLow, 0.1, 2.0);
+    Vector3<double> p_WC(-0.25, -0.75, 0.15);
+    Vector3<double> rpy_WC(0, 0, M_PI_2 * 0.9);
+    auto camera = builder.template AddSystem<systems::sensors::dev::RgbdCamera>(
+        "fixed", p_WC, rpy_WC, camera_properties, true);
+    builder.Connect(render_scene_graph->get_query_output_port(),
+                    camera->query_object_input_port());
+
+    // TODO(russt): Add additional cameras.
+    builder.ExportOutput(camera->color_image_output_port(),
+                         "camera0_rgb_image");
+    builder.ExportOutput(camera->depth_image_output_port(),
+                         "camera0_depth_image");
+    builder.ExportOutput(camera->label_image_output_port(),
+                         "camera0_label_image");
+  }
+
   builder.ExportOutput(scene_graph_->get_pose_bundle_output_port(),
                        "pose_bundle");
 

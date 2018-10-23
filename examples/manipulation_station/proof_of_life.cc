@@ -7,6 +7,8 @@
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
+#include "drake/systems/sensors/image.h"
+#include "drake/systems/sensors/visualization/sensors_visualization.h"
 
 namespace drake {
 namespace examples {
@@ -37,42 +39,48 @@ int do_main(int argc, char* argv[]) {
   geometry::ConnectDrakeVisualizer(&builder, station->get_mutable_scene_graph(),
                                    station->GetOutputPort("pose_bundle"));
 
+  systems::sensors::ConnectRgbdCameraToDrakeVisualizer(
+      &builder, station->GetOutputPort("camera0_rgb_image"),
+      station->GetOutputPort("camera0_depth_image"),
+      station->GetOutputPort("camera0_label_image"));
+
   auto diagram = builder.Build();
 
   systems::Simulator<double> simulator(*diagram);
-  auto &context = diagram->GetMutableSubsystemContext(
+  auto& station_context = diagram->GetMutableSubsystemContext(
       *station, &simulator.get_mutable_context());
 
   // Set initial conditions for the IIWA:
   VectorXd q0(7);
   q0 << 0, 0.6, 0, -1.75, 0, 1.0, 0;
-  station->SetIiwaPosition(q0, &context);
+  station->SetIiwaPosition(q0, &station_context);
   const VectorXd qdot0 = VectorXd::Zero(7);
-  station->SetIiwaVelocity(qdot0, &context);
+  station->SetIiwaVelocity(qdot0, &station_context);
 
   // Position command should hold the arm at the initial state.
-  context.FixInputPort(station->GetInputPort("iiwa_position").get_index(), q0);
+  station_context.FixInputPort(
+      station->GetInputPort("iiwa_position").get_index(), q0);
 
   // Zero feed-forward torque.
-  context.FixInputPort(
+  station_context.FixInputPort(
       station->GetInputPort("iiwa_feedforward_torque").get_index(),
       VectorXd::Zero(7));
 
   // Nominal WSG position is open.
-  context.FixInputPort(station->GetInputPort("wsg_position").get_index(),
-                       Vector1d(0.05));
+  station_context.FixInputPort(
+      station->GetInputPort("wsg_position").get_index(), Vector1d(0.05));
   // Force limit at 40N.
-  context.FixInputPort(station->GetInputPort("wsg_force_limit").get_index(),
-                       Vector1d(40.0));
+  station_context.FixInputPort(
+      station->GetInputPort("wsg_force_limit").get_index(), Vector1d(40.0));
 
   simulator.set_target_realtime_rate(FLAGS_target_realtime_rate);
   simulator.Initialize();
   simulator.StepTo(FLAGS_duration);
 
   // Check that the arm is (very roughly) in the commanded position.
-  VectorXd q = station->GetIiwaPosition(context);
+  VectorXd q = station->GetIiwaPosition(station_context);
   if (!is_approx_equal_abstol(q, q0, 1.e-3)) {
-    std::cout << "q - q0  = " << (q-q0).transpose() << std::endl;
+    std::cout << "q - q0  = " << (q - q0).transpose() << std::endl;
     DRAKE_ABORT_MSG("q is not sufficiently close to q0.");
   }
 

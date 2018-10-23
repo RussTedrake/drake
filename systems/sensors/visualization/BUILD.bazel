@@ -1,4 +1,19 @@
+load("@drake//tools/skylark:drake_cc.bzl", "drake_cc_library")
 load("//tools/lint:lint.bzl", "add_lint_tests")
+
+package(default_visibility = ["//visibility:public"])
+
+drake_cc_library(
+    name = "sensors_visualization",
+    srcs = ["sensors_visualization.cc"],
+    hdrs = ["sensors_visualization.h"],
+    deps = [
+        "//lcm",
+        "//systems/framework:diagram_builder",
+        "//systems/lcm:lcm_pubsub_system",
+        "//systems/sensors:image_to_lcm_image_array_t",
+    ],
+)
 
 add_lint_tests(
     python_lint_extra_srcs = [
