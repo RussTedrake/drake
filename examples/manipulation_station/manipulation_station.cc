@@ -339,23 +339,27 @@ void ManipulationStation<T>::Finalize() {
                     render_scene_graph->get_source_pose_port(
                         plant_->get_source_id().value()));
 
-    // Create the first camera.
     geometry::dev::render::DepthCameraProperties camera_properties(
         640, 480, M_PI_4, geometry::dev::render::Fidelity::kLow, 0.1, 2.0);
-    Vector3<double> p_WC(-0.25, -0.75, 0.15);
-    Vector3<double> rpy_WC(0, 0, M_PI_2 * 0.9);
-    auto camera = builder.template AddSystem<systems::sensors::dev::RgbdCamera>(
-        "fixed", p_WC, rpy_WC, camera_properties, true);
-    builder.Connect(render_scene_graph->get_query_output_port(),
-                    camera->query_object_input_port());
 
-    // TODO(russt): Add additional cameras.
-    builder.ExportOutput(camera->color_image_output_port(),
-                         "camera0_rgb_image");
-    builder.ExportOutput(camera->depth_image_output_port(),
-                         "camera0_depth_image");
-    builder.ExportOutput(camera->label_image_output_port(),
-                         "camera0_label_image");
+    // Create the cameras.
+    for (int i = 0; i < 3; i++) {
+      auto camera =
+          builder.template AddSystem<systems::sensors::dev::RgbdCamera>(
+              "camera" + std::to_string(i),
+              geometry::dev::SceneGraph<double>::world_frame_id(),
+              get_camera_pose(i), camera_properties, true);
+      builder.Connect(render_scene_graph->get_query_output_port(),
+                      camera->query_object_input_port());
+
+      // TODO(russt): Add additional cameras.
+      builder.ExportOutput(camera->color_image_output_port(),
+                           "camera" + std::to_string(i) + "_rgb_image");
+      builder.ExportOutput(camera->depth_image_output_port(),
+                           "camera" + std::to_string(i) + "_depth_image");
+      builder.ExportOutput(camera->label_image_output_port(),
+                           "camera" + std::to_string(i) + "_label_image");
+    }
   }
 
   builder.ExportOutput(scene_graph_->get_pose_bundle_output_port(),
@@ -462,6 +466,18 @@ void ManipulationStation<T>::SetWsgState(
                                    station_context)
       .get_mutable_discrete_state_vector()
       .SetAtIndex(0, q);
+}
+
+template <typename T>
+Isometry3d ManipulationStation<T>::get_camera_pose(int camera_number) {
+  DRAKE_DEMAND(camera_number >= 0 && camera_number <= 2);
+
+  // TODO(russt): Set these to the real camera poses.
+  Vector3<double> p_WC(-0.25, -0.75, 0.15);
+  Vector3<double> rpy_WC(0, 0, M_PI_2 * 0.9);
+
+  return RigidTransform<double>(RollPitchYaw<double>(rpy_WC), p_WC)
+      .GetAsIsometry3();
 }
 
 }  // namespace manipulation_station

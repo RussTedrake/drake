@@ -28,7 +28,7 @@ namespace manipulation_station {
 ///   @input_port{iiwa_position}
 ///   @input_port{iiwa_feedforward_torque}
 ///   @input_port{wsg_position}
-///   @input_porT{wsg_force_limit},
+///   @input_port{wsg_force_limit},
 ///   @output_port{iiwa_position_commanded}
 ///   @output_port{iiwa_position_measured}
 ///   @output_port{iiwa_velocity_estimated}
@@ -38,6 +38,15 @@ namespace manipulation_station {
 ///   @output_port{iiwa_torque_external}
 ///   @output_port{wsg_state_measured}
 ///   @output_port{wsg_force_measured}
+///   @output_port{camera0_rgb_image}
+///   @output_port{camera0_depth_image}
+///   @output_port{<b style="color:orange">camera0_label_image</b>}
+///   @output_port{camera1_rgb_image}
+///   @output_port{camera1_depth_image}
+///   @output_port{<b style="color:orange">camera1_label_image</b>}
+///   @output_port{camera2_rgb_image}
+///   @output_port{camera2_depth_image}
+///   @output_port{<b style="color:orange">camera2_label_image</b>}
 ///   @output_port{<b style="color:orange">pose_bundle</b>} }
 ///
 /// Note that outputs in <b style="color:orange">orange</b> are
@@ -181,6 +190,11 @@ class ManipulationStation : public systems::Diagram<T> {
   // once I have an API for finding the base joint of a model instance.
 
   // TODO(russt): Implement SetIiwaPIDGains(...).
+
+  /// Get the pose of the RGB-D cameras mounted on the station in the world
+  /// frame.
+  // TODO(russt): Allow users to set this for their system, as well?
+  static Eigen::Isometry3d get_camera_pose(int camera_number);
 
  private:
   // These are only valid until Finalize() is called.
