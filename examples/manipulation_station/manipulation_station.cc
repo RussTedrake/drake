@@ -348,7 +348,7 @@ void ManipulationStation<T>::Finalize() {
           builder.template AddSystem<systems::sensors::dev::RgbdCamera>(
               "camera" + std::to_string(i),
               geometry::dev::SceneGraph<double>::world_frame_id(),
-              get_camera_pose(i), camera_properties, true);
+              get_camera_pose(i), camera_properties, false);
       builder.Connect(render_scene_graph->get_query_output_port(),
                       camera->query_object_input_port());
 

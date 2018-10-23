@@ -8,6 +8,7 @@
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/sensors/image.h"
+#include "drake/systems/sensors/image_to_lcm_image_array_t.h"
 #include "drake/systems/sensors/visualization/sensors_visualization.h"
 
 namespace drake {
@@ -39,10 +40,32 @@ int do_main(int argc, char* argv[]) {
   geometry::ConnectDrakeVisualizer(&builder, station->get_mutable_scene_graph(),
                                    station->GetOutputPort("pose_bundle"));
 
-  systems::sensors::ConnectRgbdCameraToDrakeVisualizer(
-      &builder, station->GetOutputPort("camera0_rgb_image"),
-      station->GetOutputPort("camera0_depth_image"),
-      station->GetOutputPort("camera0_label_image"));
+  /*
+    systems::sensors::ConnectRgbdCameraToDrakeVisualizer(
+        &builder, station->GetOutputPort("camera0_rgb_image"),
+        station->GetOutputPort("camera0_depth_image"),
+        station->GetOutputPort("camera0_label_image"));
+        */
+  auto image_to_lcm_image_array =
+      builder.template AddSystem<systems::sensors::ImageToLcmImageArrayT>();
+  image_to_lcm_image_array->set_name("converter");
+  for (int i = 0; i < 3; i++) {
+    const auto& cam_port =
+        image_to_lcm_image_array
+            ->DeclareImageInputPort<systems::sensors::PixelType::kRgba8U>(
+                "camera" + std::to_string(i));
+    builder.Connect(
+        station->GetOutputPort("camera" + std::to_string(i) + "_rgb_image"),
+        cam_port);
+  }
+  auto image_array_lcm_publisher = builder.template AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<robotlocomotion::image_array_t>(
+          "DRAKE_RGBD_CAMERA_IMAGES", nullptr));
+
+  image_array_lcm_publisher->set_name("rgbd_publisher");
+  image_array_lcm_publisher->set_publish_period(1. / 10 /* 10 fps */);
+  builder.Connect(image_to_lcm_image_array->image_array_t_msg_output_port(),
+                  image_array_lcm_publisher->get_input_port());
 
   auto diagram = builder.Build();
 
