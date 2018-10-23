@@ -58,7 +58,7 @@ PYBIND11_MODULE(manipulation_station, m) {
 
   py::class_<ManipulationStationHardwareInterface, Diagram<double>>(
       m, "ManipulationStationHardwareInterface")
-      .def(py::init<lcm::DrakeLcmInterface*>(), py::arg("lcm") = nullptr,
+      .def(py::init<bool>(), py::arg("block_until_connected") = true,
            doc.ManipulationStationHardwareInterface.ctor.doc_3)
       .def("get_controller_plant",
            &ManipulationStationHardwareInterface::get_controller_plant,

@@ -68,14 +68,14 @@ context = diagram.GetMutableSubsystemContext(station,
 if args.hardware:
     # TODO(russt): read the status port once and set the teleop state before
     # sending any commands.
-    print("todo")
+    q0 = station.GetOutputPort("iiwa_position_measured").Eval(
+        context).get_value()
 else:
     # Set up the context for the simulator:
     q0 = [0, 0.6, 0, -1.75, 0, 1.0, 0]
     station.SetIiwaPosition(q0, context)
     station.SetIiwaVelocity(np.zeros(7), context)
     station.SetWsgState(0.05, 0, context)
-    teleop.set(q0)
     X_WObject = Isometry3.Identity()
     X_WObject.set_translation([.6, 0, 0])
     station.get_mutable_multibody_plant().tree().SetFreeBodyPoseOrThrow(
@@ -84,6 +84,7 @@ else:
         station.GetMutableSubsystemContext(station.get_mutable_multibody_plant(),
             context))
 
+teleop.set(q0)
 context.FixInputPort(station.GetInputPort(
     "iiwa_feedforward_torque").get_index(), np.zeros(7))
 

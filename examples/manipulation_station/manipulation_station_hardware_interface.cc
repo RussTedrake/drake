@@ -23,13 +23,10 @@ using multibody::parsing::AddModelFromSdfFile;
 // TODO(russt): Set publishing defaults.
 
 ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
-    lcm::DrakeLcmInterface* lcm)
+    bool block_until_connected)
     : owned_controller_plant_(std::make_unique<MultibodyPlant<double>>()),
-      owned_lcm_(lcm ? nullptr : new lcm::DrakeLcm()) {
-  if (lcm == nullptr) {
-    lcm = owned_lcm_.get();
-    owned_lcm_->StartReceiveThread();
-  }
+      owned_lcm_(new lcm::DrakeLcm()) {
+  owned_lcm_->StartReceiveThread();
 
   systems::DiagramBuilder<double> builder;
 
@@ -38,7 +35,7 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
       builder.AddSystem<examples::kuka_iiwa_arm::IiwaCommandSender>();
   auto iiwa_command_publisher = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<drake::lcmt_iiwa_command>(
-          "IIWA_COMMAND", lcm));
+          "IIWA_COMMAND", owned_lcm_.get()));
   builder.ExportInput(iiwa_command_sender->get_position_input_port(),
                       "iiwa_position");
   builder.ExportInput(iiwa_command_sender->get_torque_input_port(),
@@ -51,7 +48,13 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
       builder.AddSystem<examples::kuka_iiwa_arm::IiwaStatusReceiver>();
   auto iiwa_status_subscriber = builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<drake::lcmt_iiwa_status>(
-          "IIWA_STATUS", lcm));
+          "IIWA_STATUS", owned_lcm_.get()));
+  if (block_until_connected) {
+    std::cout << "Waiting for IIWA status message..." << std::flush;
+    iiwa_status_subscriber->WaitForMessage(0);
+    std::cout << "Received!" << std::endl;
+  }
+
   builder.ExportOutput(
       iiwa_status_receiver->get_position_commanded_output_port(),
       "iiwa_position_commanded");
@@ -75,6 +78,8 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
   builder.ExportInput(wsg_position->get_input_port(), "wsg_position");
   auto wsg_force_limit = builder.AddSystem<systems::PassThrough>(1);
   builder.ExportInput(wsg_force_limit->get_input_port(), "wsg_force_limit");
+
+  // TODO(russt): Read WSG status (and block if block_until_connected).
 
   builder.BuildInto(this);
   this->set_name("manipulation_station");

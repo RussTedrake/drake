@@ -38,14 +38,7 @@ class ManipulationStationHardwareInterface : public systems::Diagram<double> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulationStationHardwareInterface)
 
-  /// @param lcm A pointer to the LCM subsystem to use, which must
-  ///   remain valid for the lifetime of this object. If null, a
-  ///   drake::lcm::DrakeLcm object is allocated and maintained internally,
-  ///   but you should generally provide an LCM interface yourself, since
-  ///   there should normally be just one of these typically-heavyweight
-  ///   objects per program.
-  explicit ManipulationStationHardwareInterface(
-      lcm::DrakeLcmInterface* lcm = nullptr);
+  ManipulationStationHardwareInterface(bool block_until_connected = true);
 
   /// @param scene_graph Registers the known geometries with the @p
   ///   scene_graph, and creates a `geometry_pose` output port.  Only the
