@@ -191,7 +191,7 @@ time_step = 0.002
 station = builder.AddSystem(ManipulationStation(time_step))
 station.AddCupboard()
 station.Finalize()
-q0 = [0, 0.5, 0, -1.0, 0, 1.0, 0]
+q0 = [0, 0.6, 0, -1.75, 0, 1.0, 0]
 
 robot = station.get_controller_plant()
 params = DifferentialInverseKinematicsParameters(robot.num_positions(),
@@ -231,9 +231,7 @@ context = diagram.GetMutableSubsystemContext(station,
 
 station.SetIiwaPosition(q0, context)
 station.SetIiwaVelocity(np.zeros(7), context)
-#teleop.SetXYZ([.6, 0, .6])
 teleop.SetPose(differential_ik.ForwardKinematics(q0))
-teleop.SetRPY(RollPitchYaw(0,np.pi,0))
 
 context.FixInputPort(station.GetInputPort(
     "iiwa_feedforward_torque").get_index(), np.zeros(7))

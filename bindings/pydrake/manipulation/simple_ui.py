@@ -161,7 +161,7 @@ class SchunkWsgButtons(LeafSystem):
         else:
             # Closing to 0mm can smash the fingers together and keep applying
             # force even when no object is grasped.
-            output.SetAtIndex(0, 0.008)
+            output.SetAtIndex(0, 0.002)
 
     def CalcForceLimitOutput(self, context, output):
         output.SetAtIndex(0, 40.0)
