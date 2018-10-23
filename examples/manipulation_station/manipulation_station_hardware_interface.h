@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "drake/lcm/drake_lcm.h"
+#include "drake/lcm/drake_lcm_interface.h"
 #include "drake/multibody/multibody_tree/multibody_plant/multibody_plant.h"
 #include "drake/systems/framework/diagram.h"
 
@@ -18,7 +19,7 @@ namespace manipulation_station {
 ///   @input_port{iiwa_position}
 ///   @input_port{iiwa_feedforward_torque}
 ///   @input_port{wsg_position}
-///   @input_porT{wsg_force_limit},
+///   @input_port{wsg_force_limit},
 ///   @output_port{iiwa_position_commanded}
 ///   @output_port{iiwa_position_measured}
 ///   @output_port{iiwa_velocity_estimated}
@@ -68,6 +69,7 @@ class ManipulationStationHardwareInterface : public systems::Diagram<double> {
  private:
   std::unique_ptr<multibody::multibody_plant::MultibodyPlant<double>>
       owned_controller_plant_;
+  std::unique_ptr<lcm::DrakeLcm> owned_lcm_;
 };
 
 }  // namespace manipulation_station

@@ -2,6 +2,7 @@
 
 #include "drake/common/find_resource.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
+#include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/multibody/multibody_tree/parsing/multibody_plant_sdf_parser.h"
@@ -22,8 +23,14 @@ using multibody::parsing::AddModelFromSdfFile;
 // TODO(russt): Set publishing defaults.
 
 ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
-    lcm::DrakeLcmInterface* lcm_optional)
-    : owned_controller_plant_(std::make_unique<MultibodyPlant<double>>()) {
+    lcm::DrakeLcmInterface* lcm)
+    : owned_controller_plant_(std::make_unique<MultibodyPlant<double>>()),
+      owned_lcm_(lcm ? nullptr : new lcm::DrakeLcm()) {
+  if (lcm == nullptr) {
+    lcm = owned_lcm_.get();
+    owned_lcm_->StartReceiveThread();
+  }
+
   systems::DiagramBuilder<double> builder;
 
   // Publish IIWA command.
@@ -31,7 +38,7 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
       builder.AddSystem<examples::kuka_iiwa_arm::IiwaCommandSender>();
   auto iiwa_command_publisher = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<drake::lcmt_iiwa_command>(
-          "IIWA_COMMAND", lcm_optional));
+          "IIWA_COMMAND", lcm));
   builder.ExportInput(iiwa_command_sender->get_position_input_port(),
                       "iiwa_position");
   builder.ExportInput(iiwa_command_sender->get_torque_input_port(),
@@ -39,17 +46,12 @@ ManipulationStationHardwareInterface::ManipulationStationHardwareInterface(
   builder.Connect(iiwa_command_sender->get_output_port(0),
                   iiwa_command_publisher->get_input_port());
 
-  // The iiwa_command_publisher may have created the LCM object, or may just
-  // be passing back a reference.  In either case, use the same reference for
-  // all of the LCM systems constructed/added here.
-  lcm::DrakeLcmInterface& lcm = iiwa_command_publisher->lcm();
-
   // Receive IIWA status and populate the output ports.
   auto iiwa_status_receiver =
       builder.AddSystem<examples::kuka_iiwa_arm::IiwaStatusReceiver>();
   auto iiwa_status_subscriber = builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<drake::lcmt_iiwa_status>(
-          "IIWA_STATUS", &lcm));
+          "IIWA_STATUS", lcm));
   builder.ExportOutput(
       iiwa_status_receiver->get_position_commanded_output_port(),
       "iiwa_position_commanded");

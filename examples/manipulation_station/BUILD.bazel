@@ -43,6 +43,7 @@ drake_cc_library(
         "manipulation_station_hardware_interface.h",
     ],
     data = [
+        "//manipulation/models/iiwa_description:models",
         "//manipulation/models/wsg_50_description:models",
         "@models_robotlocomotion//:models",
     ],

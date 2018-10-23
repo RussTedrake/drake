@@ -22,7 +22,7 @@ class JointSliders(VectorSystem):
     """
 
     def __init__(self, robot, lower_limit=-10., upper_limit=10.,
-                 resolution=-1, update_period_sec=0.1,
+                 resolution=-1, length=200, update_period_sec=0.1,
                  title=None):
         """"
         Args:
@@ -75,7 +75,7 @@ class JointSliders(VectorSystem):
                                             to=min(upp[j], upper_limit[k]),
                                             resolution=resolution[k],
                                             label=joint.name(),
-                                            length=200,
+                                            length=length,
                                             orient=tk.HORIZONTAL))
                 self.slider[k].pack()
                 k += 1
