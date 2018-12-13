@@ -89,6 +89,26 @@ drake_cc_binary(
 )
 
 drake_cc_binary(
+    name = "random_clutter_generator",
+    srcs = [
+        "random_clutter_generator.cc",
+    ],
+    add_test_rule = 1,
+    data = [
+        ":models",
+        "//examples/kuka_iiwa_arm:models",
+    ],
+    deps = [
+        "//common:find_resource",
+        "//geometry:geometry_visualization",
+        "//geometry:scene_graph",
+        "//multibody/multibody_tree/multibody_plant",
+        "//multibody/parsing",
+        "@gflags",
+    ],
+)
+
+drake_cc_binary(
     name = "proof_of_life",
     srcs = [
         "proof_of_life.cc",
