@@ -19,6 +19,18 @@
 namespace drake {
 namespace pydrake {
 
+template <typename PyClass, typename Class, typename T>
+void DefReadOnlyUniquePtr(PyClass* cls, const char* name,
+    std::unique_ptr<T> Class::*member, const char* doc) {
+  auto getter = py::cpp_function(
+      [member](const Class* self) {
+        const std::unique_ptr<T>& value = self->*member;
+        return value.get();
+      },
+      py_reference_internal);
+  cls->def_property_readonly(name, getter, doc);
+}
+
 PYBIND11_MODULE(controllers, m) {
   // NOLINTNEXTLINE(build/namespaces): Emulate placement in namespace.
   using namespace drake::systems::controllers;
@@ -261,59 +273,19 @@ PYBIND11_MODULE(controllers, m) {
           doc.FiniteHorizonLinearQuadraticRegulatorOptions.input_port_index
               .doc);
 
-  py::class_<FiniteHorizonLinearQuadraticRegulatorResult>(m,
-      "FiniteHorizonLinearQuadraticRegulatorResult",
-      doc.FiniteHorizonLinearQuadraticRegulatorResult.doc)
-      // Note: Use these as a workaround for .def_readwrite not working with
-      // unique_ptr (yet).
-      .def("x0",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self) {
-            return self->x0.get();
-          },
-          py_reference_internal,
-          doc.FiniteHorizonLinearQuadraticRegulatorResult.x0.doc)
-      .def("x0",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self, double t) {
-            DRAKE_DEMAND(self->x0 != nullptr);
-            return self->x0->value(t);
-          },
-          py::arg("t"), doc.FiniteHorizonLinearQuadraticRegulatorResult.x0.doc)
-      .def("u0",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self) {
-            return self->u0.get();
-          },
-          py_reference_internal,
-          doc.FiniteHorizonLinearQuadraticRegulatorResult.u0.doc)
-      .def("u0",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self, double t) {
-            DRAKE_DEMAND(self->u0 != nullptr);
-            return self->u0->value(t);
-          },
-          py::arg("t"), doc.FiniteHorizonLinearQuadraticRegulatorResult.u0.doc)
-      .def("K",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self) {
-            return self->K.get();
-          },
-          py_reference_internal,
-          doc.FiniteHorizonLinearQuadraticRegulatorResult.K.doc)
-      .def("K",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self, double t) {
-            DRAKE_DEMAND(self->K != nullptr);
-            return self->K->value(t);
-          },
-          py::arg("t"), doc.FiniteHorizonLinearQuadraticRegulatorResult.K.doc)
-      .def("S",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self) {
-            return self->S.get();
-          },
-          py_reference_internal,
-          doc.FiniteHorizonLinearQuadraticRegulatorResult.S.doc)
-      .def("S",
-          [](FiniteHorizonLinearQuadraticRegulatorResult* self, double t) {
-            DRAKE_DEMAND(self->S != nullptr);
-            return self->S->value(t);
-          },
-          py::arg("t"), doc.FiniteHorizonLinearQuadraticRegulatorResult.S.doc);
+  {
+    using Class = FiniteHorizonLinearQuadraticRegulatorResult;
+    constexpr auto& cls_doc = doc.FiniteHorizonLinearQuadraticRegulatorResult;
+    // This class should avoid having its members be writeable (#8904). If this
+    // is to be made constructable by Python, it should clone the arguments to
+    // avoid lifetime issues.
+    py::class_<Class> cls(
+        m, "FiniteHorizonLinearQuadraticRegulatorResult", cls_doc.doc);
+    DefReadOnlyUniquePtr(&cls, "x0", &Class::x0, cls_doc.x0.doc);
+    DefReadOnlyUniquePtr(&cls, "u0", &Class::u0, cls_doc.u0.doc);
+    DefReadOnlyUniquePtr(&cls, "K", &Class::K, cls_doc.K.doc);
+    DefReadOnlyUniquePtr(&cls, "S", &Class::S, cls_doc.S.doc);
+  }
 
   m.def("FiniteHorizonLinearQuadraticRegulator",
       &FiniteHorizonLinearQuadraticRegulator, py::arg("system"),
