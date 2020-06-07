@@ -83,7 +83,14 @@ class TestMeshcat(unittest.TestCase):
 
         simulator = Simulator(diagram, diagram_context)
         simulator.set_publish_every_time_step(False)
+        visualizer.start_recording()
         simulator.AdvanceTo(.1)
+        visualizer.stop_recording()
+        # Should have animation "clips" for both bodies.
+        self.assertEqual(len(visualizer._animation.clips), 2)
+        visualizer.publish_recording()
+        visualizer.reset_recording()
+        self.assertEqual(len(visualizer._animation.clips), 0)
 
     def test_kuka(self):
         """Kuka IIWA with mesh geometry."""
