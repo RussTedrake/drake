@@ -250,8 +250,10 @@ class MeshcatVisualizer(LeafSystem):
         self.set_name('meshcat_visualizer')
         self.DeclarePeriodicPublish(draw_period, 0.0)
         self.draw_period = draw_period
-        self.reset_recording()
+
+        # Recording.
         self._is_recording = False
+        self.reset_recording()
 
         # Pose bundle (from SceneGraph) input port.
         # TODO(tehbelinda): Rename the `lcm_visualization` port to match
@@ -396,29 +398,39 @@ class MeshcatVisualizer(LeafSystem):
     def start_recording(self):
         """
         Sets a flag to record future publish events as animation frames.
-        Note: This syntax was chosen to match PyPlotVisualizer.
+
+        Precondition:
+            This must not be recording.
         """
+        # N.B. This recording API is intended to match PyPlotVisualizer's.
+        assert not self._is_recording, "Must NOT be recording"
         self._is_recording = True
 
     def stop_recording(self):
         """
-        Sets a flag to record future publish events as animation frames.
-        Note: This syntax was chosen to match PyPlotVisualizer.
-        """
-        self._is_recording = False
+        Stops recording and publishes animation to ``meshcat.Visualizer``.
 
-    def publish_recording(self):
+        This animation can be seen using `self.vis.render_static()`, and you
+        can browse the animation using meshcat's controls in the browser
+        widget, under "Animations > default".
+
+        Precondition:
+            This must be recording.
         """
-        Publish any recorded animation to Meshcat.  Use the controls dialog
-        in the browser to review it.
-        """
+        # N.B. This recording API is intended to match PyPlotVisualizer's.
+        assert self._is_recording, "Must be recording"
+        self._is_recording = False
         self.vis.set_animation(self._animation)
 
     def reset_recording(self):
         """
         Resets all recorded data.
-        Note: This syntax was chosen to match PyPlotVisualizer.
+
+        Precondition:
+            This must not be recording.
         """
+        # N.B. This recording API is intended to match PyPlotVisualizer's.
+        assert not self._is_recording, "Must NOT be recording"
         self._animation = Animation(default_framerate=1./self.draw_period)
         self._recording_frame_num = 0
 
