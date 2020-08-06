@@ -63,25 +63,22 @@ def _convert_mesh(geom):
 
     if geom.type == geom.BOX:
         assert geom.num_float_data == 3
-        meshcat_geom = meshcat.geometry.Box(geom.float_data)
+        meshcat_geom = g.Box(geom.float_data)
     elif geom.type == geom.SPHERE:
         assert geom.num_float_data == 1
-        meshcat_geom = meshcat.geometry.Sphere(geom.float_data[0])
+        meshcat_geom = g.Sphere(geom.float_data[0])
     elif geom.type == geom.CYLINDER:
         assert geom.num_float_data == 2
-        meshcat_geom = meshcat.geometry.Cylinder(
-            geom.float_data[1],
-            geom.float_data[0])
+        meshcat_geom = g.Cylinder(geom.float_data[1], geom.float_data[0])
         # In Drake, cylinders are along +z
         # In meshcat, cylinders are along +y
         # Rotate to fix this misalignment
-        extra_rotation = tf.rotation_matrix(
-            math.pi/2., [1, 0, 0])
+        extra_rotation = tf.rotation_matrix(math.pi/2., [1, 0, 0])
         element_local_tf[0:3, 0:3] = (
             element_local_tf[0:3, 0:3].dot(
                 extra_rotation[0:3, 0:3]))
     elif geom.type == geom.MESH:
-        meshcat_geom = meshcat.geometry.ObjMeshGeometry.from_file(
+        meshcat_geom = g.ObjMeshGeometry.from_file(
             geom.string_data[0:-3] + "obj")
         # Handle scaling.
         # TODO(gizatt): See meshcat-python#40 for incorporating scale as a
@@ -98,9 +95,9 @@ def _convert_mesh(geom):
         # rather than what files happen to be present.
         candidate_texture_path_png = geom.string_data[0:-3] + "png"
         if os.path.exists(candidate_texture_path_png):
-            material = meshcat.geometry.MeshLambertMaterial(
-                map=meshcat.geometry.ImageTexture(
-                    image=meshcat.geometry.PngImage.from_file(
+            material = g.MeshLambertMaterial(
+                map=g.ImageTexture(
+                    image=g.PngImage.from_file(
                         candidate_texture_path_png)))
     else:
         print("UNSUPPORTED GEOMETRY TYPE {} IGNORED".format(
@@ -117,7 +114,7 @@ def _convert_mesh(geom):
             for i in range(3):
                 val += (256**(2 - i)) * int(255 * rgb[i])
             return val
-        material = meshcat.geometry.MeshLambertMaterial(
+        material = g.MeshLambertMaterial(
             color=rgb_2_hex(geom.color[:3]),
             transparent=geom.color[3] != 1.,
             opacity=geom.color[3])
@@ -149,11 +146,11 @@ def AddTriad(vis, name, prefix, length=1., radius=0.04, opacity=1.):
     rotation_axes = [[0, 0, 1], [0, 1, 0], [1, 0, 0]]
 
     for i in range(3):
-        material = meshcat.geometry.MeshLambertMaterial(
+        material = g.MeshLambertMaterial(
             color=colors[i], opacity=opacity)
         vis[prefix][name][axes_name[i]].set_object(
-            meshcat.geometry.Cylinder(length, radius), material)
-        X = meshcat.transformations.rotation_matrix(
+            g.Cylinder(length, radius), material)
+        X = tf.rotation_matrix(
             np.pi/2, rotation_axes[i])
         X[0:3, 3] = delta_xyz[i]
         vis[prefix][name][axes_name[i]].set_transform(X)
@@ -213,7 +210,8 @@ class MeshcatVisualizer(LeafSystem):
                  frames_to_draw={},
                  frames_opacity=1.,
                  axis_length=0.15,
-                 axis_radius=0.006):
+                 axis_radius=0.006,
+                 jupyter_comms=False):
         """
         Args:
             scene_graph: A SceneGraph object.
@@ -222,9 +220,9 @@ class MeshcatVisualizer(LeafSystem):
             prefix: Appears as the root of the tree structure in the meshcat
                 data structure
             zmq_url: Optionally set a url to connect to the visualizer.
-                Use ``zmp_url="default"`` to the value obtained by running a
+                Use ``zmq_url="default"`` to the value obtained by running a
                 single ``meshcat-server`` in another terminal.
-                Use ``zmp_url=None`` or ``zmq_url="new"`` to start a new server
+                Use ``zmq_url=None`` or ``zmq_url="new"`` to start a new server
                 (as a child of this process); a new web browser will be opened
                 (the url will also be printed to the console).
                 Use e.g. ``zmq_url="tcp://127.0.0.1:6000"`` to specify a
@@ -241,6 +239,11 @@ class MeshcatVisualizer(LeafSystem):
                     {"1": {"A", "B"}}.
             frames_opacity, axis_length and axis_radius are the opacity, length
                 and radius of the coordinate axes to be drawn.
+            jupyter_comms: Set to True to use the meshcat.jupyter.
+                JupyterVisualizer instead of the meshcat.Visualizer, which 
+                connects directly to the browser using the jupyter kernel comms 
+                instead of ZMQ.  This renders the values of `zmq_url` and 
+                `open_browser` irrelevant.
         Note:
             This call will not return until it connects to the
             ``meshcat-server``.
@@ -261,27 +264,33 @@ class MeshcatVisualizer(LeafSystem):
         self.DeclareAbstractInputPort("lcm_visualization",
                                       AbstractValue.Make(PoseBundle(0)))
 
-        if zmq_url == "default":
-            zmq_url = "tcp://127.0.0.1:6000"
-        elif zmq_url == "new":
-            zmq_url = None
+        if jupyter_comms:
+            from meshcat.jupyter import JupyterVisualizer
+            self.vis = JupyterVisualizer()
+        else:
+            if zmq_url == "default":
+                zmq_url = "tcp://127.0.0.1:6000"
+            elif zmq_url == "new":
+                zmq_url = None
 
-        if zmq_url is None and open_browser is None:
-            open_browser = True
+            if zmq_url is None and open_browser is None:
+                open_browser = True
 
-        # Set up meshcat.
+            # Set up meshcat.
+            if zmq_url is not None:
+                print("Connecting to meshcat-server at "
+                      f"zmq_url={zmq_url}")
+            self.vis = meshcat.Visualizer(zmq_url=zmq_url)
+            print("Connected to meshcat-server.")
+
         self.prefix = prefix
-        if zmq_url is not None:
-            print("Connecting to meshcat-server at zmq_url=" + zmq_url + "...")
-        self.vis = meshcat.Visualizer(zmq_url=zmq_url)
-        print("Connected to meshcat-server.")
         self._scene_graph = scene_graph
 
         # Set background color (to match drake-visualizer).
         self.vis['/Background'].set_property("top_color", [242, 242, 255])
         self.vis['/Background'].set_property("bottom_color", [77, 77, 89])
 
-        if open_browser:
+        if open_browser and not jupyter_comms:
             webbrowser.open(self.vis.url())
 
         def on_initialize(context, event):
@@ -624,10 +633,10 @@ class MeshcatContactVisualizer(LeafSystem):
                 self._contact_key_counter += 1
                 # create cylinders with small radius.
                 vis[prefix]["contact_forces"][new_contact.key].set_object(
-                    meshcat.geometry.Cylinder(
+                    g.Cylinder(
                         height=1. / self._force_cylinder_longitudinal_scale,
                         radius=0.01 / self._force_cylinder_radial_scale),
-                    meshcat.geometry.MeshLambertMaterial(color=0xff0000))
+                    g.MeshLambertMaterial(color=0xff0000))
             else:
                 # contact is not new, but it's valid.
                 contact.needs_pruning = False
