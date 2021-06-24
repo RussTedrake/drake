@@ -728,6 +728,7 @@ drake_cc_library(
     name = "ibex_solver",
     srcs = [
         "ibex_solver_common.cc",
+        "ibex_converter.cc",
     ] + select({
         "//tools:no_dreal": [
             "no_ibex.cc",
@@ -736,7 +737,10 @@ drake_cc_library(
             "ibex_solver.cc",
         ],
     }),
-    hdrs = ["ibex_solver.h"],
+    hdrs = [
+        "ibex_converter.h",
+        "ibex_solver.h",
+    ],
     deps = [
         ":mathematical_program",
         ":solver_base",
