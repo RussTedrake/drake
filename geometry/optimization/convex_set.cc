@@ -22,15 +22,18 @@ using solvers::VectorXDecisionVariable;
 using std::pair;
 using std::sqrt;
 
+std::unique_ptr<ConvexSet> ConvexSet::Clone() const { return cloner_(*this); }
+
 HPolyhedron::HPolyhedron(const Eigen::Ref<const Eigen::MatrixXd>& A,
                          const Eigen::Ref<const Eigen::VectorXd>& b)
-    : ConvexSet(A.cols()), A_{A}, b_{b} {
+    : ConvexSet(ConvexSetTag<HPolyhedron>(), A.cols()), A_{A}, b_{b} {
   DRAKE_DEMAND(A.rows() == b.size());
 }
 
 HPolyhedron::HPolyhedron(const QueryObject<double>& query_object,
                          GeometryId geometry_id,
-                         std::optional<FrameId> expressed_in) : ConvexSet(3) {
+                         std::optional<FrameId> expressed_in)
+    : ConvexSet(ConvexSetTag<HPolyhedron>(), 3) {
   std::pair<Eigen::MatrixXd, Eigen::VectorXd> Ab_G;
   query_object.inspector().GetShape(geometry_id).Reify(this, &Ab_G);
 
@@ -130,14 +133,17 @@ void HPolyhedron::ImplementGeometry(const Box& box, void* data) {
 }
 
 HyperEllipsoid::HyperEllipsoid(const Eigen::Ref<const Eigen::MatrixXd>& A,
-                     const Eigen::Ref<const Eigen::VectorXd>& center)
-    : ConvexSet(center.size()), A_{A}, center_{center} {
+                               const Eigen::Ref<const Eigen::VectorXd>& center)
+    : ConvexSet(ConvexSetTag<HyperEllipsoid>(), center.size()),
+      A_{A},
+      center_{center} {
   DRAKE_DEMAND(A.rows() == center.size());
 }
 
-HyperEllipsoid::HyperEllipsoid(
-    const QueryObject<double>& query_object, GeometryId geometry_id,
-    std::optional<FrameId> expressed_in) : ConvexSet(3) {
+HyperEllipsoid::HyperEllipsoid(const QueryObject<double>& query_object,
+                               GeometryId geometry_id,
+                               std::optional<FrameId> expressed_in)
+    : ConvexSet(ConvexSetTag<HyperEllipsoid>(), 3) {
   Eigen::Matrix3d A_G;
   query_object.inspector().GetShape(geometry_id).Reify(this, &A_G);
   // p_GG_varᵀ * A_Gᵀ * A_G * p_GG_var ≤ 1

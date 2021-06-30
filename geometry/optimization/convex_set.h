@@ -54,12 +54,21 @@ The geometry::optimization tools support:
 @ingroup solvers
 */
 
+/** Simple struct for instantiating the type-specific ConvexSet functionality.
+ A class derived from the ConvexSet class will invoke the parent's constructor
+ as ConvexSet(ConvexSetTag<DerivedSet>()). */
+template <typename S>
+struct ConvexSetTag{};
+
 /** Abstract base class for defining a convex set.
 @ingroup geometry_optimization
 */
 class ConvexSet : public ShapeReifier {
  public:
   virtual ~ConvexSet() {}
+
+  /** Creates a unique deep copy of this set. */
+  std::unique_ptr<ConvexSet> Clone() const;
 
   /** Returns the dimension of the vector space in which the elements of this
   set are evaluated.  Contrast this with the `affine dimension`: the
@@ -100,8 +109,29 @@ class ConvexSet : public ShapeReifier {
  protected:
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(ConvexSet)
 
-  explicit ConvexSet(int ambient_dimension)
-      : ambient_dimension_{ambient_dimension} {}
+  /** A derived class should invoke this with e.g.:
+  ```
+   class MyConvexSet final : public ConvexSet {
+    public:
+     MyConvexSet() : ConvexSet(ConvexSetTag<MyConvexSet>()) {}
+     ...
+   };
+   ```
+   */
+  template <typename S>
+  ConvexSet(ConvexSetTag<S>, int ambient_dimension)
+      : ambient_dimension_{ambient_dimension} {
+    static_assert(std::is_base_of_v<ConvexSet, S>,
+                  "Concrete sets *must* be derived from the ConvexSet class");
+
+    DRAKE_DEMAND(ambient_dimension >= 0);
+
+    cloner_ = [](const ConvexSet& set) {
+      DRAKE_DEMAND(typeid(set) == typeid(S));
+      const S& derived_set = static_cast<const S&>(set);
+      return std::unique_ptr<ConvexSet>(new S(derived_set));
+    };
+  }
 
   // Non-virtual interface implementations.
   virtual bool DoPointInSet(const Eigen::Ref<const Eigen::VectorXd>& x,
@@ -115,6 +145,7 @@ class ConvexSet : public ShapeReifier {
   DoToShapeWithPose() const = 0;
 
   int ambient_dimension_{0};
+  std::function<std::unique_ptr<ConvexSet>(const ConvexSet&)> cloner_;
 };
 
 // Forward declaration.
