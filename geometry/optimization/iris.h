@@ -4,8 +4,10 @@
 #include <optional>
 #include <vector>
 
+#include "drake/common/symbolic.h"
 #include "drake/geometry/optimization/convex_set.h"
 #include "drake/geometry/optimization/hpolyhedron.h"
+#include "drake/multibody/plant/multibody_plant.h"
 
 namespace drake {
 namespace geometry {
@@ -32,6 +34,12 @@ struct IrisOptions {
   /** IRIS will terminate if the change in the *volume* of the hyperellipsoid
   between iterations is less that this threshold. */
   double termination_threshold{2e-2};  // from rdeits/iris-distro.
+
+  /** For IRIS in configuration space, we retreat by this margin from each
+  C-space obstacle in order to avoid the possibility of requiring an infinite
+  number of faces to approximate a curved boundary.  TODO: clarify the units.
+  */
+  double configuration_space_margin{1e-2};
 };
 
 /** The IRIS (Iterative Region Inflation by Semidefinite programming) algorithm,
@@ -84,6 +92,14 @@ the current implementation of the IRIS algorithm.
 ConvexSets MakeIrisObstacles(
     const QueryObject<double>& query_object,
     std::optional<FrameId> reference_frame = std::nullopt);
+
+// TODO(russt): Pass a context of the plant if/when we support setting kinematic
+// parameters.
+HPolyhedron IrisInConfigurationSpace(
+    const multibody::MultibodyPlant<symbolic::Expression>& plant,
+    const QueryObject<double>& query_object,
+    const Eigen::Ref<const Eigen::VectorXd>& sample,
+    const IrisOptions& options = IrisOptions());
 
 }  // namespace optimization
 }  // namespace geometry

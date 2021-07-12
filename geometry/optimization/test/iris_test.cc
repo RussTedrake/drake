@@ -7,6 +7,8 @@
 #include "drake/geometry/optimization/vpolytope.h"
 #include "drake/geometry/scene_graph.h"
 #include "drake/math/rigid_transform.h"
+#include "drake/multibody/parsing/parser.h"
+#include "drake/systems/framework/diagram_builder.h"
 
 namespace drake {
 namespace geometry {
@@ -110,8 +112,7 @@ GTEST_TEST(IrisTest, BallInBox) {
 └─────┴─┴─────┘ */
 GTEST_TEST(IrisTest, MultipleBoxes) {
   ConvexSets obstacles;
-  obstacles.emplace_back(
-      VPolytope::MakeBox(Vector2d(.1, .5), Vector2d(1, 1)));
+  obstacles.emplace_back(VPolytope::MakeBox(Vector2d(.1, .5), Vector2d(1, 1)));
   obstacles.emplace_back(
       VPolytope::MakeBox(Vector2d(-1, -1), Vector2d(-.1, -.5)));
   obstacles.emplace_back(
@@ -231,6 +232,191 @@ TEST_F(SceneGraphTester, MultipleBoxes) {
   EXPECT_TRUE(region.PointInSet(Vector3d(0.0, 0.0, 0.99)));
   EXPECT_TRUE(region.PointInSet(Vector3d(0.0, 0.0, -0.99)));
 }
+
+namespace {
+
+// Helper method for testing IrisInConfigurationSpace from a urdf string.
+HPolyhedron IrisFromUrdf(const std::string urdf,
+                       const Eigen::Ref<const Eigen::VectorXd>& sample) {
+  systems::DiagramBuilder<double> builder;
+  auto [plant, scene_graph] =
+      multibody::AddMultibodyPlantSceneGraph(&builder, 0.0);
+  multibody::Parser(&plant).AddModelFromString(urdf, "urdf");
+  plant.Finalize();
+  auto diagram = builder.Build();
+
+  auto context = diagram->CreateDefaultContext();
+  auto query_object =
+      scene_graph.get_query_output_port().Eval<QueryObject<double>>(
+          scene_graph.GetMyContextFromRoot(*context));
+
+  std::unique_ptr<multibody::MultibodyPlant<symbolic::Expression>>
+      symbolic_plant = systems::System<double>::ToSymbolic(plant);
+  return IrisInConfigurationSpace(*symbolic_plant, query_object, sample);
+}
+
+}  // namespace
+
+// One prismatic link with joint limits.  Iris should return the joint limits.
+GTEST_TEST(IrisInConfigurationSpaceTest, JointLimits) {
+  const std::string limits_urdf = R"(
+<robot name="limits">
+  <link name="movable">
+    <collision>
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+  </link>
+  <joint name="movable" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <limit lower="-2" upper="2"/>
+    <parent link="world"/>
+    <child link="movable"/>
+  </joint>
+</robot>
+)";
+
+  const Vector1d sample = Vector1d::Zero();
+  HPolyhedron region = IrisFromUrdf(limits_urdf, sample);
+  
+  EXPECT_EQ(region.ambient_dimension(), 1);
+  EXPECT_TRUE(region.PointInSet(Vector1d{1.99}));
+  EXPECT_TRUE(region.PointInSet(Vector1d{-1.99}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{2.01}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{-2.01}));
+}
+
+// Three boxes.  Two on the outside are fixed.  One in the middle on a prismatic
+// joint.  The configuration space is a (convex) line segment q ∈ (−1,1).
+GTEST_TEST(IrisInConfigurationSpaceTest, BoxesPrismatic) {
+  const std::string boxes_urdf = R"(
+<robot name="boxes">
+  <link name="fixed">
+    <collision name="right">
+      <origin rpy="0 0 0" xyz="2 0 0"/>
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+    <collision name="left">
+      <origin rpy="0 0 0" xyz="-2 0 0"/>
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+  </link>
+  <joint name="fixed_link_weld" type="fixed">
+    <parent link="world"/>
+    <child link="fixed"/>
+  </joint>
+  <link name="movable">
+    <collision name="center">
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+  </link>
+  <joint name="movable" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <limit lower="-2" upper="2"/>
+    <parent link="world"/>
+    <child link="movable"/>
+  </joint>
+</robot>
+)";
+
+  const Vector1d sample = Vector1d::Zero();
+  HPolyhedron region = IrisFromUrdf(boxes_urdf, sample);
+  
+  EXPECT_EQ(region.ambient_dimension(), 1);
+  EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
+  EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{1.02}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{-1.02}));
+}
+
+// Three spheres.  Two on the outside are fixed.  One in the middle on a
+// prismatic joint.  The configuration space is a (convex) line segment q ∈
+// (−1,1).
+GTEST_TEST(IrisInConfigurationSpaceTest, SpheresPrismatic) {
+  const std::string spheres_urdf = R"(
+<robot name="spheres">
+  <link name="fixed">
+    <collision name="right">
+      <origin rpy="0 0 0" xyz="2 0 0"/>
+      <geometry><sphere radius=".5"/></geometry>
+    </collision>
+    <collision name="left">
+      <origin rpy="0 0 0" xyz="-2 0 0"/>
+      <geometry><sphere radius=".5"/></geometry>
+    </collision>
+  </link>
+  <joint name="fixed_link_weld" type="fixed">
+    <parent link="world"/>
+    <child link="fixed"/>
+  </joint>
+  <link name="movable">
+    <collision name="center">
+      <geometry><sphere radius=".5"/></geometry>
+    </collision>
+  </link>
+  <joint name="movable" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <limit lower="-2" upper="2"/>
+    <parent link="world"/>
+    <child link="movable"/>
+  </joint>
+</robot>
+)";
+
+  const Vector1d sample = Vector1d::Zero();
+  HPolyhedron region = IrisFromUrdf(spheres_urdf, sample);
+  
+  EXPECT_EQ(region.ambient_dimension(), 1);
+  EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
+  EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{1.02}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{-1.02}));
+}
+
+/*
+// A pendulum between two (fixed) boxes.  The configuration space is a (convex)
+// line segment q ∈ (−1,1).
+GTEST_TEST(IrisInConfigurationSpaceTest, Pendulum) {
+  const std::string pendulum_urdf = R"(
+<robot name="pendulum">
+  <link name="fixed">
+    <collision name="right">
+      TODO: Finish this...
+      <origin rpy="0 0 0" xyz="2 0 0"/>
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+    <collision name="left">
+      <origin rpy="0 0 0" xyz="-2 0 0"/>
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+  </link>
+  <joint name="fixed_link_weld" type="fixed">
+    <parent link="world"/>
+    <child link="fixed"/>
+  </joint>
+  <link name="movable">
+    <collision name="center">
+      <geometry><box size="1 1 1"/></geometry>
+    </collision>
+  </link>
+  <joint name="movable" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <limit lower="-2" upper="2"/>
+    <parent link="world"/>
+    <child link="movable"/>
+  </joint>
+</robot>
+)";
+
+  const Vector1d sample = Vector1d::Zero();
+  HPolyhedron region = IrisFromUrdf(boxes_urdf, sample);
+  
+  EXPECT_EQ(region.ambient_dimension(), 1);
+  EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
+  EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{1.02}));
+  EXPECT_FALSE(region.PointInSet(Vector1d{-1.02}));
+}
+*/
 
 }  // namespace
 }  // namespace optimization
