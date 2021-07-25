@@ -1,7 +1,9 @@
 #include "drake/geometry/optimization/iris.h"
 
 #include <algorithm>
+#include <limits>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -115,24 +117,20 @@ class IrisConvexSetMaker final : public ShapeReifier {
     *reference_frame_ = reference_frame;
   }
 
-  void set_geometry_id(const GeometryId& geom_id) {
-    geom_id_ = geom_id;
-  }
+  void set_geometry_id(const GeometryId& geom_id) { geom_id_ = geom_id; }
 
   using ShapeReifier::ImplementGeometry;
 
   void ImplementGeometry(const Sphere&, void* data) {
     DRAKE_DEMAND(geom_id_.is_valid());
     auto& set = *static_cast<copyable_unique_ptr<ConvexSet>*>(data);
-    set = 
-        std::make_unique<Hyperellipsoid>(query_, geom_id_, reference_frame_);
+    set = std::make_unique<Hyperellipsoid>(query_, geom_id_, reference_frame_);
   }
 
   void ImplementGeometry(const HalfSpace&, void* data) {
     DRAKE_DEMAND(geom_id_.is_valid());
     auto& set = *static_cast<copyable_unique_ptr<ConvexSet>*>(data);
-    set = 
-        std::make_unique<HPolyhedron>(query_, geom_id_, reference_frame_);
+    set = std::make_unique<HPolyhedron>(query_, geom_id_, reference_frame_);
   }
 
   void ImplementGeometry(const Box&, void* data) {
@@ -142,15 +140,13 @@ class IrisConvexSetMaker final : public ShapeReifier {
     // discusses a significant performance improvement using a "least-distance
     // programming" instance from CVXGEN that exploited the VPolytope
     // representation.  So we may wish to revisit this.
-    set = 
-        std::make_unique<HPolyhedron>(query_, geom_id_, reference_frame_);
+    set = std::make_unique<HPolyhedron>(query_, geom_id_, reference_frame_);
   }
 
   void ImplementGeometry(const Ellipsoid&, void* data) {
     DRAKE_DEMAND(geom_id_.is_valid());
     auto& set = *static_cast<copyable_unique_ptr<ConvexSet>*>(data);
-    set = 
-        std::make_unique<Hyperellipsoid>(query_, geom_id_, reference_frame_);
+    set = std::make_unique<Hyperellipsoid>(query_, geom_id_, reference_frame_);
   }
 
  private:
@@ -170,7 +166,7 @@ ConvexSets MakeIrisObstacles(const QueryObject<double>& query_object,
   ConvexSets sets(geom_ids.size());
 
   IrisConvexSetMaker maker(query_object, reference_frame);
-  int count=0;
+  int count = 0;
   for (GeometryId geom_id : geom_ids) {
     maker.set_geometry_id(geom_id);
     inspector.GetShape(geom_id).Reify(&maker, &sets[count++]);
@@ -188,15 +184,15 @@ namespace {
 // Returns true iff a collision is found.
 // Sets `closest` to an optimizing solution q*, if a solution is found.
 bool FindClosestCollision(const multibody::MultibodyPlant<Expression>& plant,
-                            const multibody::Body<Expression>& bodyA,
-                            const multibody::Body<Expression>& bodyB,
-                            const ConvexSet& setA, const ConvexSet& setB,
-                            const Hyperellipsoid& E,
-                            const Eigen::Ref<const Eigen::MatrixXd>& A,
-                            const Eigen::Ref<const Eigen::VectorXd>& b,
-                            const solvers::SolverBase& solver,
-                            systems::Context<Expression>* context,
-                            VectorXd* closest) {
+                          const multibody::Body<Expression>& bodyA,
+                          const multibody::Body<Expression>& bodyB,
+                          const ConvexSet& setA, const ConvexSet& setB,
+                          const Hyperellipsoid& E,
+                          const Eigen::Ref<const Eigen::MatrixXd>& A,
+                          const Eigen::Ref<const Eigen::VectorXd>& b,
+                          const solvers::SolverBase& solver,
+                          systems::Context<Expression>* context,
+                          VectorXd* closest) {
   solvers::MathematicalProgram prog;
   auto q = prog.NewContinuousVariables(plant.num_positions(), "q");
 
@@ -242,7 +238,7 @@ HPolyhedron IrisInConfigurationSpace(
   DRAKE_DEMAND(plant.GetPositionUpperLimits().array().isFinite().all());
   HPolyhedron P = HPolyhedron::MakeBox(plant.GetPositionLowerLimits(),
                                        plant.GetPositionUpperLimits());
-  DRAKE_DEMAND(P.A().rows() == 2*nq);
+  DRAKE_DEMAND(P.A().rows() == 2 * nq);
 
   const double kEpsilonEllipsoid = 1e-2;
   Hyperellipsoid E = Hyperellipsoid::MakeHypersphere(kEpsilonEllipsoid, sample);
@@ -282,15 +278,15 @@ HPolyhedron IrisInConfigurationSpace(
   int iteration = 0;
   MatrixXd tangent_matrix;
 
-  //solvers::IbexSolver solver;
-  solvers::SnoptSolver solver;
+  // solvers::IbexSolver solver;
+  solvers::IbexSolver solver;
   DRAKE_DEMAND(solver.is_available() && solver.is_enabled());
   auto context = plant.CreateDefaultContext();
   VectorXd closest(nq);
 
   while (true) {
     tangent_matrix = 2.0 * E.A().transpose() * E.A();
-    int num_constraints = 2*nq;  // Start with just the joint limits.
+    int num_constraints = 2 * nq;  // Start with just the joint limits.
     // Find separating hyperplanes
     for (const auto [geomA, geomB] : pairs) {
       while (true) {
@@ -340,7 +336,7 @@ HPolyhedron IrisInConfigurationSpace(
     }
     best_volume = volume;
   }
-  return P;  
+  return P;
 }
 
 }  // namespace optimization

@@ -237,7 +237,7 @@ namespace {
 
 // Helper method for testing IrisInConfigurationSpace from a urdf string.
 HPolyhedron IrisFromUrdf(const std::string urdf,
-                       const Eigen::Ref<const Eigen::VectorXd>& sample) {
+                         const Eigen::Ref<const Eigen::VectorXd>& sample) {
   systems::DiagramBuilder<double> builder;
   auto [plant, scene_graph] =
       multibody::AddMultibodyPlantSceneGraph(&builder, 0.0);
@@ -277,7 +277,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, JointLimits) {
 
   const Vector1d sample = Vector1d::Zero();
   HPolyhedron region = IrisFromUrdf(limits_urdf, sample);
-  
+
   EXPECT_EQ(region.ambient_dimension(), 1);
   EXPECT_TRUE(region.PointInSet(Vector1d{1.99}));
   EXPECT_TRUE(region.PointInSet(Vector1d{-1.99}));
@@ -320,7 +320,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, BoxesPrismatic) {
 
   const Vector1d sample = Vector1d::Zero();
   HPolyhedron region = IrisFromUrdf(boxes_urdf, sample);
-  
+
   EXPECT_EQ(region.ambient_dimension(), 1);
   EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
   EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));
@@ -364,7 +364,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, SpheresPrismatic) {
 
   const Vector1d sample = Vector1d::Zero();
   HPolyhedron region = IrisFromUrdf(spheres_urdf, sample);
-  
+
   EXPECT_EQ(region.ambient_dimension(), 1);
   EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
   EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));
@@ -380,7 +380,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, Pendulum) {
 <robot name="pendulum">
   <link name="fixed">
     <collision name="right">
-      TODO: Finish this...
+      // TODO(russt): Finish this...
       <origin rpy="0 0 0" xyz="2 0 0"/>
       <geometry><box size="1 1 1"/></geometry>
     </collision>
@@ -409,7 +409,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, Pendulum) {
 
   const Vector1d sample = Vector1d::Zero();
   HPolyhedron region = IrisFromUrdf(boxes_urdf, sample);
-  
+
   EXPECT_EQ(region.ambient_dimension(), 1);
   EXPECT_TRUE(region.PointInSet(Vector1d{0.98}));
   EXPECT_TRUE(region.PointInSet(Vector1d{-0.98}));

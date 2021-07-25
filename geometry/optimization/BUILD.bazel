@@ -49,8 +49,8 @@ drake_cc_library(
     deps = [
         ":convex_set",
         "//geometry:scene_graph",
-        "//multibody/plant",
         "//multibody/parsing:parser",
+        "//multibody/plant",
         "//solvers:ibex_solver",
         "//solvers:snopt_solver",
         "//systems/framework:diagram_builder",
