@@ -67,6 +67,20 @@ void ExtractQuadraticCosts(const MathematicalProgram& prog,
   }
 }
 
+// Adds @p f into @p factor using @p ibex_converter and @p expr_ctrs.
+void AddFormula(
+    const Formula& f, IbexConverter* const ibex_converter,
+    ibex::SystemFactory* const factory,
+    std::vector<std::unique_ptr<const ibex::ExprCtr, ExprCtrDeleter>>* const
+        expr_ctrs) {
+  std::unique_ptr<const ibex::ExprCtr, ExprCtrDeleter> expr_ctr{
+      ibex_converter->Convert(f)};
+  if (expr_ctr) {
+    factory->add_ctr(*expr_ctr);
+    expr_ctrs->push_back(std::move(expr_ctr));
+  }
+}
+
 }  // namespace
 
 bool IbexSolver::is_available() { return true; }
@@ -116,11 +130,12 @@ void IbexSolver::DoSolve(const MathematicalProgram& prog,
   for (const auto& b : prog.linear_constraints()) {
     Formula f{b.evaluator()->CheckSatisfied(b.variables())};
     std::cerr << "Add constraint: " << f << "\n";
-    std::unique_ptr<const ibex::ExprCtr, ExprCtrDeleter> expr_ctr{
-        ibex_converter.Convert(f)};
-    if (expr_ctr) {
-      factory.add_ctr(*expr_ctr);
-      expr_ctrs.push_back(std::move(expr_ctr));
+    if (symbolic::is_conjunction(f)) {
+      for (const auto& f_i : symbolic::get_operands(f)) {
+        AddFormula(f_i, &ibex_converter, &factory, &expr_ctrs);
+      }
+    } else {
+      AddFormula(f, &ibex_converter, &factory, &expr_ctrs);
     }
     ibex_converter.set_need_to_delete_variables(true);
   }
