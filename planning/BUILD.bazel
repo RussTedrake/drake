@@ -1,0 +1,37 @@
+# -*- python -*-
+
+load(
+    "@drake//tools/skylark:drake_cc.bzl",
+    "drake_cc_binary",
+    "drake_cc_googletest",
+    "drake_cc_library",
+    "drake_cc_package_library",
+)
+load("//tools/lint:lint.bzl", "add_lint_tests")
+
+package(default_visibility = ["//visibility:public"])
+
+drake_cc_package_library(
+    name = "planning",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":rrt_planners",
+    ],
+)
+
+drake_cc_library(
+    name = "rrt_planners",
+    srcs = ["rrt_planners.cc"],
+    hdrs = ["rrt_planners.h"],
+    deps = [
+    ],
+)
+
+drake_cc_googletest(
+    name = "rrt_planners_test",
+    deps = [
+        ":rrt_planners",
+    ],
+)
+
+add_lint_tests()
