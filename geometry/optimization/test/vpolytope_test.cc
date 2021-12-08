@@ -6,6 +6,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
+#include "drake/common/test_utilities/expect_throws_message.h"
 #include "drake/geometry/geometry_frame.h"
 #include "drake/geometry/optimization/test_utilities.h"
 #include "drake/geometry/scene_graph.h"
@@ -175,7 +176,7 @@ GTEST_TEST(VPolytopeTest, FromHUnitBoxTest) {
   EXPECT_FALSE(V.PointInSet(out2_W, kTol));
 }
 
-GTEST_TEST(HPolyhedronTest, From2DHPolytopeTest) {
+GTEST_TEST(VPolytopeTest, From2DHPolytopeTest) {
   Matrix<double, 4, 2> A;
   Vector4d b;
   A <<  1, -1,  // y ≥ x
@@ -191,20 +192,18 @@ GTEST_TEST(HPolyhedronTest, From2DHPolytopeTest) {
       in4_W{.01, 1.99}, out1_W{-.01, -.01}, out2_W{1.01, .99},
       out3_W{1.01, 2.01}, out4_W{-.01, 2.01};
 
-  // drake::log()->info("{}", V.vertices());
-  
-  // const double kTol = 1e-11;
-  // EXPECT_TRUE(V.PointInSet(in1_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in2_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in3_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in4_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out1_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out2_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out3_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out4_W, kTol));
+  const double kTol = 1e-11;
+  EXPECT_TRUE(V.PointInSet(in1_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in2_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in3_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in4_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out1_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out2_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out3_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out4_W, kTol));
 }
 
-GTEST_TEST(HPolyhedronTest, From3DHSimplexTest) {
+GTEST_TEST(VPolytopeTest, From3DHSimplexTest) {
   Matrix<double, 4, 3> A;
   Vector4d b;
   A <<  -1,  0,  0,
@@ -220,22 +219,22 @@ GTEST_TEST(HPolyhedronTest, From3DHSimplexTest) {
       in4_W{.01, .01, .9}, in5_W{.33, .33, .33}, out1_W{-.01, -.01, -.01},
       out2_W{1., .01, .01}, out3_W{.01, 1., .01}, out4_W{.01, .01, 1.},
       out5_W{.34, .34, .34};
-  
-  // const double kTol = 1e-11;
-  // EXPECT_TRUE(V.PointInSet(in1_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in2_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in3_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in4_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in5_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out1_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out2_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out3_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out4_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out5_W, kTol));
+
+  const double kTol = 1e-11;
+  EXPECT_TRUE(V.PointInSet(in1_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in2_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in3_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in4_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in5_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out1_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out2_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out3_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out4_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out5_W, kTol));
 }
 
 // Same as FromHPolytopeTest but with two redundant constraints.
-GTEST_TEST(HPolyhedronTest, FromRedundantHPolytopeTest) {
+GTEST_TEST(VPolytopeTest, FromRedundantHPolytopeTest) {
   Matrix<double, 6, 2> A;
   Vector6d b;
   A <<  1, -1,  // y ≥ x
@@ -251,19 +250,19 @@ GTEST_TEST(HPolyhedronTest, FromRedundantHPolytopeTest) {
   const Vector2d in1_W{.01, .02}, in2_W{.99, 1.0}, in3_W{.99, 1.99},
       in4_W{.01, 1.99}, out1_W{-.01, -.01}, out2_W{1.01, .99},
       out3_W{1.01, 2.01}, out4_W{-.01, 2.01};
-  
-  // const double kTol = 1e-11;
-  // EXPECT_TRUE(V.PointInSet(in1_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in2_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in3_W, kTol));
-  // EXPECT_TRUE(V.PointInSet(in4_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out1_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out2_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out3_W, kTol));
-  // EXPECT_FALSE(V.PointInSet(out4_W, kTol));
+
+  const double kTol = 1e-11;
+  EXPECT_TRUE(V.PointInSet(in1_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in2_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in3_W, kTol));
+  EXPECT_TRUE(V.PointInSet(in4_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out1_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out2_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out3_W, kTol));
+  EXPECT_FALSE(V.PointInSet(out4_W, kTol));
 }
 
-GTEST_TEST(HPolyhedronTest, FromUnboundedHPolytopeTest) {
+GTEST_TEST(VPolytopeTest, FromUnboundedHPolytopeTest) {
   Matrix<double, 4, 2> A;
   Vector4d b;
   A <<  1, -1,  // y ≥ x
@@ -272,9 +271,7 @@ GTEST_TEST(HPolyhedronTest, FromUnboundedHPolytopeTest) {
   b << 0, 1, 2;
   HPolyhedron H(A, b);
 
-  // The following should trigger DRAKE_DEMAND(hpoly.IsBounded()) but I don't
-  // know how to test this in C++/Drake.
-  // VPolytope V(H);
+  DRAKE_EXPECT_THROWS_MESSAGE(VPolytope{H}, ".*hpoly.IsBounded().*");
 }
 
 GTEST_TEST(VPolytopeTest, CloneTest) {

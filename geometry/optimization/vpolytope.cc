@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "libqhullcpp/Qhull.h"
+#include "libqhullcpp/QhullVertexSet.h"
 
 #include "drake/common/is_approx_equal_abstol.h"
 #include "drake/solvers/solve.h"
@@ -44,8 +45,7 @@ VPolytope::VPolytope(const QueryObject<double>& query_object,
 
 VPolytope::VPolytope(const HPolyhedron& hpoly)
     : ConvexSet(&ConvexSetCloner<VPolytope>, hpoly.ambient_dimension()) {
-
-  DRAKE_DEMAND(hpoly.IsBounded());
+  DRAKE_THROW_UNLESS(hpoly.IsBounded());
 
   Eigen::MatrixXd coeffs(hpoly.A().rows(), hpoly.A().cols() + 1);
   coeffs.leftCols(hpoly.A().cols()) = hpoly.A();
@@ -68,11 +68,19 @@ VPolytope::VPolytope(const HPolyhedron& hpoly)
 
   vertices_.resize(hpoly.ambient_dimension(), qhull.facetCount());
   int ii = 0;
-  for (orgQhull::QhullFacet facet = qhull.beginFacet();
-       facet != qhull.endFacet(); facet = facet.next()) {
-    std::vector<double> vertex = facet.getCenter().toStdVector();
-    vertices_.col(ii) = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(
-        vertex.data(), vertex.size()) * hpoly.ambient_dimension();
+  for (const auto& facet : qhull.facetList()) {
+    auto incident_hyperplanes = facet.vertices();
+    Eigen::MatrixXd vertex_A(incident_hyperplanes.count(),
+                             hpoly.ambient_dimension());
+    for (int jj = 0; jj < incident_hyperplanes.count(); jj++) {
+      std::vector<double> hyperplane =
+          incident_hyperplanes.at(jj).point().toStdVector();
+      vertex_A.row(jj) = Eigen::Map<Eigen::RowVectorXd, Eigen::Unaligned>(
+          hyperplane.data(), hyperplane.size());
+    }
+    vertices_.col(ii) = vertex_A.partialPivLu().solve(Eigen::VectorXd::Ones(
+                            incident_hyperplanes.count())) +
+                        eigen_center;
     ii++;
   }
 }
