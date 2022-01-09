@@ -97,6 +97,17 @@ const {
   return bias;
 }
 
+#if EIGEN_VERSION_AT_LEAST(3, 4, 0)
+template <typename T>
+void AcrobotPlant<T>::CalcBatchTimeDerivatives(
+    const systems::Context<T>& context,
+    const AcrobotPlant::BatchStateVector& states,
+    AcrobotPlant::BatchStateVector* derivatives) const {
+  unused(context, states, derivatives);
+  std::cout << states << std::endl;
+}
+#endif
+
 // Compute the actual physics.
 template <typename T>
 void AcrobotPlant<T>::DoCalcTimeDerivatives(

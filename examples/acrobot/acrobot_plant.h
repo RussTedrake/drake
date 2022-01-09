@@ -10,6 +10,12 @@
 #include "drake/systems/framework/leaf_system.h"
 #include "drake/systems/primitives/affine_system.h"
 
+#if EIGEN_VERSION_AT_LEAST(3, 4, 0)
+// clang-format off
+#include <unsupported/Eigen/CXX11/Tensor>
+// clang-format on
+#endif
+
 namespace drake {
 namespace examples {
 namespace acrobot {
@@ -62,9 +68,20 @@ class AcrobotPlant : public systems::LeafSystem<T> {
   Matrix2<T> MassMatrix(const systems::Context<T> &context) const;
   ///@}
 
-  /// Evaluates the input port and returns the scalar value
-  /// of the commanded torque.
-  const T& get_tau(const systems::Context<T>& context) const {
+#if EIGEN_VERSION_AT_LEAST(3, 4, 0)
+  static constexpr int kBatchSize = 10;
+  using BatchStateVector =
+      Eigen::TensorFixedSize<float, Eigen::Sizes<kBatchSize, 4, 1>>;
+
+  // TODO(russt): will ultimately need systems::BatchContext<T>, and T=float.
+  void CalcBatchTimeDerivatives(const systems::Context<T>& context,
+                                const BatchStateVector& states,
+                                BatchStateVector* derivatives) const;
+#endif
+
+      /// Evaluates the input port and returns the scalar value
+      /// of the commanded torque.
+      const T& get_tau(const systems::Context<T>& context) const {
     return this->EvalVectorInput(context, 0)->GetAtIndex(0);
   }
 

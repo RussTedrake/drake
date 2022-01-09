@@ -32,6 +32,19 @@ GTEST_TEST(AcrobotPlantTest, ImplicitTimeDerivatives) {
   EXPECT_LT(residual.lpNorm<Eigen::Infinity>(), 100*kEpsilon);
 }
 
+#if EIGEN_VERSION_AT_LEAST(3, 4, 0)
+GTEST_TEST(AcrobotPlantTest, BatchTimeDerivatives) {
+  AcrobotPlant<double> plant;
+  auto context = plant.CreateDefaultContext();
+
+  // There must be a better way to do this, but the documentation is severely lacking.
+  AcrobotPlant<double>::BatchStateVector states, derivatives;
+  states.setRandom();
+  plant.CalcBatchTimeDerivatives(*context, states, &derivatives);
+  std::cout << "Derivatives:\n" << derivatives << std::endl;
+}
+#endif
+
 }  // namespace
 }  // namespace acrobot
 }  // namespace examples
