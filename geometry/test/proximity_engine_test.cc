@@ -2281,9 +2281,14 @@ TEST_F(SimplePenetrationTest, PenetrationDynamicAndAnchored) {
   ExpectPenetration(anchored_id, dynamic_id, ad_engine.get());
   std::unique_ptr<ProximityEngine<Expression>> sym_engine =
       engine_.ToScalarType<Expression>();
-  DRAKE_EXPECT_THROWS_MESSAGE(
-      ExpectPenetration(anchored_id, dynamic_id, sym_engine.get()),
-      ".*are not supported for scalar type drake::symbolic::Expression.*");
+  ExpectPenetration(anchored_id, dynamic_id, sym_engine.get());
+
+  // Set the position of the dynamic sphere to be a variable.
+  symbolic::Variable x("x");
+  unordered_map<GeometryId, RigidTransform<Expression>> sym_X_WGs{
+      {dynamic_id, RigidTransform<Expression>(Vector3<Expression>{x, 0, 0})}};
+  sym_engine->UpdateWorldPoses(sym_X_WGs);
+  ExpectPenetration(anchored_id, dynamic_id, sym_engine.get());
 }
 
 // Performs the same collision test between two dynamic spheres which belong to
@@ -2317,9 +2322,7 @@ TEST_F(SimplePenetrationTest, PenetrationDynamicAndDynamicSingleSource) {
   ExpectPenetration(origin_id, collide_id, ad_engine.get());
   std::unique_ptr<ProximityEngine<Expression>> sym_engine =
       engine_.ToScalarType<Expression>();
-  DRAKE_EXPECT_THROWS_MESSAGE(
-      ExpectPenetration(origin_id, collide_id, sym_engine.get()),
-      ".*are not supported for scalar type drake::symbolic::Expression.*");
+  ExpectPenetration(origin_id, collide_id, sym_engine.get());
 }
 
 // Tests if collisions exist between dynamic and anchored sphere. One case

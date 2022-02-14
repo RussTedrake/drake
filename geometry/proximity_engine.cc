@@ -330,6 +330,9 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
   //    a vector and the caller sets values there directly.
   void UpdateWorldPoses(
       const std::unordered_map<GeometryId, RigidTransform<T>>& X_WGs) {
+    if constexpr (std::is_same_v<T, symbolic::Expression>) {
+      return;  // We do not use AABB for Expression.
+    }
     for (const auto& id_object_pair : dynamic_objects_) {
       const GeometryId id = id_object_pair.first;
       const RigidTransform<T>& X_WG = X_WGs.at(id);
@@ -544,14 +547,18 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
     // All these quantities are aliased in the callback data.
     find_collision_candidates::CallbackData data{&collision_filter_, &pairs};
 
-    // Perform a query of the dynamic objects against themselves.
-    dynamic_tree_.collide(&data, find_collision_candidates::Callback);
+    if constexpr (std::is_same_v<T, symbolic::Expression>) {
+      // We return all collision candidates
+    } else {
+      // Perform a query of the dynamic objects against themselves.
+      dynamic_tree_.collide(&data, find_collision_candidates::Callback);
 
-    // Perform a query of the dynamic objects against the anchored. We don't do
-    // anchored against anchored because those pairs are implicitly filtered.
-    FclCollide(dynamic_tree_, anchored_tree_, &data,
-               find_collision_candidates::Callback);
-
+      // Perform a query of the dynamic objects against the anchored. We don't
+      // do anchored against anchored because those pairs are implicitly
+      // filtered.
+      FclCollide(dynamic_tree_, anchored_tree_, &data,
+                find_collision_candidates::Callback);
+    }
     std::sort(
         pairs.begin(), pairs.end(),
         [](const SortedPair<GeometryId>& p1, const SortedPair<GeometryId>& p2) {

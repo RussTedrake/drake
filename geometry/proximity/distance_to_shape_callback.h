@@ -259,6 +259,17 @@ struct ScalarSupport<Eigen::AutoDiffScalar<DerType>> {
   }
 };
 
+/* Primitive support for Expression-valued query.  */
+template <>
+struct ScalarSupport<symbolic::Expression> {
+  static bool is_supported(fcl::NODE_TYPE node1, fcl::NODE_TYPE node2) {
+    // Explicitly permit the following pair types (with ordering
+    // permutations):
+    //  (sphere, sphere)
+    return (node1 == fcl::GEOM_SPHERE && node2 == fcl::GEOM_SPHERE);
+  }
+};
+
 //@}
 
 /* The callback function for computing signed distance between two arbitrary
