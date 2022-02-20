@@ -14,6 +14,7 @@ drake_cc_package_library(
     name = "controllers",
     visibility = ["//visibility:public"],
     deps = [
+        ":continuous_value_iteration",
         ":dynamic_programming",
         ":finite_horizon_linear_quadratic_regulator",
         ":inverse_dynamics",
@@ -33,6 +34,22 @@ drake_cc_library(
     hdrs = ["state_feedback_controller_interface.h"],
     deps = [
         "//systems/framework:system",
+    ],
+)
+
+drake_cc_library(
+    name = "continuous_value_iteration",
+    srcs = ["continuous_value_iteration.cc"],
+    hdrs = [
+        "continuous_value_iteration.h",
+        "continuous_value_iteration_options.h",
+    ],
+    #testonly=1,
+    deps = [
+        "//common:essential",
+        #"//common/test_utilities:limit_malloc",
+        "//systems/framework",
+        "//systems/primitives:multilayer_perceptron",
     ],
 )
 
@@ -170,6 +187,17 @@ drake_cc_library(
     hdrs = ["test/zmp_test_util.h"],
     deps = [
         ":zmp_planner",
+    ],
+)
+
+drake_cc_googletest(
+    name = "continuous_value_iteration_test",
+    deps = [
+        ":continuous_value_iteration",
+        ":linear_quadratic_regulator",
+        "//common/test_utilities:eigen_matrix_compare",
+        "//systems/primitives:linear_system",
+        "//examples/acrobot:acrobot_plant",
     ],
 )
 

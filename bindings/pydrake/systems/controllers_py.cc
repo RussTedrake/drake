@@ -8,6 +8,7 @@
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/bindings/pydrake/symbolic_types_pybind.h"
 #include "drake/multibody/plant/multibody_plant.h"
+#include "drake/systems/controllers/continuous_value_iteration.h"
 #include "drake/systems/controllers/dynamic_programming.h"
 #include "drake/systems/controllers/finite_horizon_linear_quadratic_regulator.h"
 #include "drake/systems/controllers/inverse_dynamics.h"
@@ -35,6 +36,57 @@ PYBIND11_MODULE(controllers, m) {
   py::module::import("pydrake.systems.framework");
   py::module::import("pydrake.systems.primitives");
   py::module::import("pydrake.trajectories");
+
+  py::class_<ContinuousValueIterationOptions>(m,
+      "ContinuousValueIterationOptions", py::dynamic_attr(),
+      doc.ContinuousValueIterationOptions.doc)
+      .def(ParamInit<ContinuousValueIterationOptions>())
+      .def_readwrite("time_step", &ContinuousValueIterationOptions::time_step,
+          doc.ContinuousValueIterationOptions.time_step.doc)
+      .def_readwrite("discount_factor",
+          &ContinuousValueIterationOptions::discount_factor,
+          doc.ContinuousValueIterationOptions.discount_factor.doc)
+      .def_readwrite("input_port_index",
+          &ContinuousValueIterationOptions::input_port_index,
+          doc.ContinuousValueIterationOptions.input_port_index.doc)
+      .def_readwrite("minibatch_size",
+          &ContinuousValueIterationOptions::minibatch_size,
+          doc.ContinuousValueIterationOptions.minibatch_size.doc)
+      .def_readwrite("max_epochs", &ContinuousValueIterationOptions::max_epochs,
+          doc.ContinuousValueIterationOptions.max_epochs.doc)
+      .def_readwrite("optimization_steps_per_epoch",
+          &ContinuousValueIterationOptions::optimization_steps_per_epoch,
+          doc.ContinuousValueIterationOptions.optimization_steps_per_epoch.doc)
+      .def_readwrite("learning_rate",
+          &ContinuousValueIterationOptions::learning_rate,
+          doc.ContinuousValueIterationOptions.learning_rate.doc)
+      .def_readwrite("target_network_smoothing_factor",
+          &ContinuousValueIterationOptions::target_network_smoothing_factor,
+          doc.ContinuousValueIterationOptions.target_network_smoothing_factor
+              .doc)
+      .def_readwrite("optimization_steps_per_epoch",
+          &ContinuousValueIterationOptions::optimization_steps_per_epoch,
+          doc.ContinuousValueIterationOptions.optimization_steps_per_epoch.doc)
+      .def_readwrite("visualization_callback",
+          &ContinuousValueIterationOptions::visualization_callback,
+          doc.ContinuousValueIterationOptions.visualization_callback.doc)
+      .def_readwrite("epochs_per_visualization_callback",
+          &ContinuousValueIterationOptions::epochs_per_visualization_callback,
+          doc.ContinuousValueIterationOptions.epochs_per_visualization_callback
+              .doc)
+      .def_readwrite("input_lower_limit",
+          &ContinuousValueIterationOptions::input_lower_limit,
+          doc.ContinuousValueIterationOptions.input_lower_limit.doc)
+      .def_readwrite("input_upper_limit",
+          &ContinuousValueIterationOptions::input_upper_limit,
+          doc.ContinuousValueIterationOptions.input_upper_limit.doc);
+
+  m.def("ContinuousValueIteration", WrapCallbacks(&ContinuousValueIteration),
+      py::arg("plant"), py::arg("plant_context"), py::arg("value"),
+      py::arg("state_cost"), py::arg("R_diagonal"), py::arg("state_samples"),
+      py::arg("value_context"), py::arg("generator"),
+      py::arg("options") = ContinuousValueIterationOptions(),
+      doc.ContinuousValueIteration.doc);
 
   {
     using Class = DynamicProgrammingOptions;

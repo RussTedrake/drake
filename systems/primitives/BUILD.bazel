@@ -203,6 +203,7 @@ drake_cc_library(
     name = "multilayer_perceptron",
     srcs = ["multilayer_perceptron.cc"],
     hdrs = ["multilayer_perceptron.h"],
+    linkopts = ["-lblas"],
     deps = [
         "//systems/framework",
     ],
