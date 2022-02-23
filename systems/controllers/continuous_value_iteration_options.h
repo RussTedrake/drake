@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "drake/systems/framework/input_port.h"
 
 namespace drake {
@@ -59,6 +61,18 @@ struct ContinuousValueIterationOptions {
   /** Upper limit on the inputs. If non-empty, then it must be the size of the
    * number of inputs of the plant. */
   Eigen::VectorXd input_upper_limit{};
+
+  /** A matrix whose columns specify any states that are known to have zero
+   * cost-to-go (e.g. a goal state). Specifying these can help to stabilize the
+   * numerics of the algorithm; they are included in *every* minibatch. */
+  Eigen::MatrixXd zero_value_states{};
+
+  /** Specify number of parallel threads to use. The default value, 1, specifies
+   that simulations should be executed in serial. To use the default concurrency
+   available on your hardware (equivalent to
+   std::thread::hardware_concurrency()), use max_threads=std::nullopt.
+   Otherwise, max_threads must be >= 1. */
+  std::optional<int> max_threads{1};
 };
 
 }  // namespace controllers
