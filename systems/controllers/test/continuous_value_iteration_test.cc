@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
+#include "drake/examples/acrobot/acrobot_plant.h"
 #include "drake/math/discrete_algebraic_riccati_equation.h"
 #include "drake/systems/primitives/linear_system.h"
-#include "drake/examples/acrobot/acrobot_plant.h"
 
 namespace drake {
 namespace systems {
@@ -30,12 +30,6 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
   const Eigen::Matrix2d Q = Eigen::Matrix2d::Identity();
   const Vector1d R = Vector1d::Ones();
 
-  // Quadratic regulator state cost.
-  const auto state_cost = [&Q](const Context<double>& context) {
-    const Eigen::Vector2d x = context.get_continuous_state().CopyToVector();
-    return x.dot(Q * x);
-  };
-
   MultilayerPerceptron<double> value(
       {2, 16, 16, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
@@ -55,6 +49,10 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
     }
   }
 
+  // Quadratic regulator state cost.
+  Eigen::RowVectorXd state_cost =
+      (state_samples.array() * (Q * state_samples).array()).colwise().sum();
+
   ContinuousValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.9;
@@ -62,6 +60,7 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
   options.target_network_smoothing_factor = 1;
   options.learning_rate = 1e-4;
   options.epochs_per_visualization_callback = 10;
+  options.max_threads = 2;
 
   int last_epoch{0};
   double last_loss{100};
@@ -72,11 +71,11 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
     std::cout << "epoch " << epoch << ": loss = " << loss << std::endl;
   };
 
-  ContinuousValueIteration(plant, *plant_context, value, state_cost, R,
-                           state_samples, value_context.get(), &generator,
+  ContinuousValueIteration(plant, *plant_context, value, state_samples,
+                           state_cost, R, value_context.get(), &generator,
                            options);
 
-  EXPECT_EQ(last_epoch, options.max_epochs-10);
+  EXPECT_EQ(last_epoch, options.max_epochs - 10);
   EXPECT_LE(last_loss, 1e-4);
 
   // Compute the optimal solution.
@@ -97,20 +96,22 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
                               .sum()
                               .matrix();
   value.BatchOutput(*value_context, test_samples, &Jhat);
-  EXPECT_TRUE(CompareMatrices(Jhat, Jd, 0.075));
+  EXPECT_TRUE(CompareMatrices(Jhat, Jd, 0.078));
 }
 
+/*
+bazel build --compilation_mode=opt --copt=-g \
+  //systems/controllers:continuous_value_iteration_test
+valgrind --tool=callgrind \
+  bazel-bin/systems/controllers/continuous_value_iteration_test \
+  --gtest_filter='*Acrobot*'
+kcachegrind callgrind.out.[your_id]
+*/
 GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
   examples::acrobot::AcrobotPlant<double> plant;
   auto plant_context = plant.CreateDefaultContext();
 
   Eigen::Matrix4d Q = Eigen::Vector4d(10, 10, 1, 1).asDiagonal();
-  // Quadratic regulator state cost.
-  const auto state_cost = [&Q](const Context<double>& context) {
-    Eigen::Vector4d x = context.get_continuous_state().CopyToVector();
-    x[0] -= M_PI;
-    return x.dot(Q * x);
-  };
   Vector1d R(1.0);
 
   MultilayerPerceptron<double> value(
@@ -121,7 +122,7 @@ GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
   RandomGenerator generator(123);
   value.SetRandomContext(value_context.get(), &generator);
 
-  Eigen::VectorXd q_samples = Eigen::VectorXd::LinSpaced(21, 0, 2*M_PI);
+  Eigen::VectorXd q_samples = Eigen::VectorXd::LinSpaced(21, 0, 2 * M_PI);
   Eigen::VectorXd qdot_samples = Eigen::VectorXd::LinSpaced(15, -5, 5);
   Eigen::Matrix4Xd state_samples(4, q_samples.size() * q_samples.size() *
                                         qdot_samples.size() *
@@ -140,13 +141,24 @@ GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
     }
   }
 
+  // Quadratic regulator state cost.
+  const auto quadratic_cost =
+      [&Q](const Eigen::MatrixXd& states) -> Eigen::RowVectorXd {
+    Eigen::MatrixXd x = states;
+    x.row(0).array() -= M_PI;
+    return (x.array() * (Q * x).array()).colwise().sum();
+  };
+  Eigen::RowVectorXd state_cost = quadratic_cost(state_samples);
+
   ContinuousValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.99;
-  options.max_epochs = 500;
+  options.max_epochs = 5;
+  options.optimization_steps_per_epoch = 10;
   options.target_network_smoothing_factor = 0.05;
   options.learning_rate = 1e-5;
-  options.epochs_per_visualization_callback = 10;
+  options.epochs_per_visualization_callback = 20;
+  options.max_threads = std::nullopt;
 
   int last_epoch{0};
   double last_loss{100};
@@ -157,8 +169,8 @@ GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
     std::cout << "epoch " << epoch << ": loss = " << loss << std::endl;
   };
 
-  ContinuousValueIteration(plant, *plant_context, value, state_cost, R,
-                           state_samples, value_context.get(), &generator,
+  ContinuousValueIteration(plant, *plant_context, value, state_samples,
+                           state_cost, R, value_context.get(), &generator,
                            options);
 }
 

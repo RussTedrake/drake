@@ -79,11 +79,17 @@ PYBIND11_MODULE(controllers, m) {
           doc.ContinuousValueIterationOptions.input_lower_limit.doc)
       .def_readwrite("input_upper_limit",
           &ContinuousValueIterationOptions::input_upper_limit,
-          doc.ContinuousValueIterationOptions.input_upper_limit.doc);
+          doc.ContinuousValueIterationOptions.input_upper_limit.doc)
+      .def_readwrite("zero_value_states",
+          &ContinuousValueIterationOptions::zero_value_states,
+          doc.ContinuousValueIterationOptions.zero_value_states.doc)
+      .def_readwrite("max_threads",
+          &ContinuousValueIterationOptions::max_threads,
+          doc.ContinuousValueIterationOptions.max_threads.doc);
 
-  m.def("ContinuousValueIteration", WrapCallbacks(&ContinuousValueIteration),
+  m.def("ContinuousValueIteration", &ContinuousValueIteration,
       py::arg("plant"), py::arg("plant_context"), py::arg("value"),
-      py::arg("state_cost"), py::arg("R_diagonal"), py::arg("state_samples"),
+      py::arg("state_samples"), py::arg("state_cost"), py::arg("R_diagonal"),
       py::arg("value_context"), py::arg("generator"),
       py::arg("options") = ContinuousValueIterationOptions(),
       doc.ContinuousValueIteration.doc);

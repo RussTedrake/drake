@@ -14,8 +14,8 @@ namespace controllers {
    ẋ = f(x,u) = f₁(x) + f₂(x)u
  we attempt to minimize the infinite-horizon cost
    ∫ eᵞᵗ ℓ(x,u)dt, where ℓ(x,u) = ℓ₁(x) + uᵀRu, and R=R^T ≻ 0,
- by estimating the optimal cost-to-go function, Ĵ(x), described by a
- MultilayerPerceptron.
+ by estimating the optimal cost-to-go function using a function, Ĵ(x),
+ described by a MultilayerPerceptron.
 
  At each step of the algorithm, we use the greedy policy w.r.t. Ĵ(x):
    u*(x) = argminᵤ [ ℓ(x,u) + ∂J/∂x f(x,u) ],
@@ -34,10 +34,10 @@ namespace controllers {
  plant parameters.
  @param value is a MultilayerPerceptron representing the estimated
  cost-to-go function.
- @param state_cost_function implements ℓ₁(x) in the description above.
- @param R_diagonal specifies the positive diagonal quadratic running cost uᵀRu.
- @param state_samples is a nx-by-N matrix, where nx is the number of
+ @param state_samples is an nx-by-N matrix, where nx is the number of
  continuous states in the plant. These are the xᵢ in the description above.
+ @param state_cost is a vector of length N with values ℓ₁(state_samples).
+ @param R_diagonal specifies the positive diagonal quadratic running cost uᵀRu.
  @param generator is a RandomGenerator; the algorithm is deterministic given the
  state of this generator.
  @param options is a ContinuousValueIterationOptions struct.
@@ -51,9 +51,9 @@ namespace controllers {
 void ContinuousValueIteration(
     const System<double>& plant, const Context<double>& plant_context,
     const MultilayerPerceptron<double>& value,
-    const std::function<double(const Context<double>&)>& state_cost,
-    const Eigen::Ref<const Eigen::VectorXd>& R_diagonal,
     const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
+    const Eigen::Ref<const Eigen::RowVectorXd>& state_cost,
+    const Eigen::Ref<const Eigen::VectorXd>& R_diagonal,
     Context<double>* value_context, RandomGenerator* generator,
     const ContinuousValueIterationOptions& options =
         ContinuousValueIterationOptions());

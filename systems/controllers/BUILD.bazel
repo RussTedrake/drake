@@ -196,8 +196,8 @@ drake_cc_googletest(
         ":continuous_value_iteration",
         ":linear_quadratic_regulator",
         "//common/test_utilities:eigen_matrix_compare",
-        "//systems/primitives:linear_system",
         "//examples/acrobot:acrobot_plant",
+        "//systems/primitives:linear_system",
     ],
 )
 
