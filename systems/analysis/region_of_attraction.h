@@ -39,6 +39,15 @@ struct RegionOfAttractionOptions {
    * details.
    */
   bool use_implicit_dynamics{false};
+
+  /** If non-empty, a list of variables `qᵢ` for which we will apply the
+   * symbolic::SinCosSubstitution: instances of sin(qᵢ) and cos(qᵢ) in the
+   * dynamics and/or Lyapunov candidate will be replaced with new variables
+   * `sᵢ` and `cᵢ`, and the Lyapunov conditions will be verified on the variety
+   * `sᵢ² + cᵢ² = 1`. This allows us to use polynomial optimization methods on
+   * many systems provided in a trigonometric form.
+   */
+  symbolic::Variables sin_cos_variables{};
 };
 
 /**

@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include "drake/examples/pendulum/pendulum_plant.h"
 #include "drake/solvers/mosek_solver.h"
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/primitives/constant_vector_source.h"
@@ -15,6 +16,7 @@ namespace analysis {
 namespace {
 
 using std::pow;
+using symbolic::Environment;
 using symbolic::Expression;
 using symbolic::Polynomial;
 using symbolic::Variable;
@@ -256,6 +258,56 @@ GTEST_TEST(RegionOfAttractionTest, ImplicitDynamics) {
   Variable x = *V.GetVariables().begin();
   const Polynomial V_expected{x * x};
   EXPECT_TRUE(Polynomial(V).CoefficientsAlmostEqual(V_expected, 1e-6));
+}
+
+// ẋ = −sin(x) has a fixed point at the origin with a region of attraction x ∈
+// (−π,π).  We demonstrate this using the Lyapunov function V = 1−cos(x) which
+// should get certified for V < 2.
+GTEST_TEST(RegionOfAttractionTest, TrigPoly1) {
+  Variable x("x");
+  const auto system = SymbolicVectorSystemBuilder()
+                          .state(x)
+                          .dynamics(-sin(x))
+                          .Build();
+  auto context = system->CreateDefaultContext();
+
+  RegionOfAttractionOptions options;
+  options.state_variables = Vector1<Variable>{x};
+  options.sin_cos_variables.insert(x);
+  options.lyapunov_candidate = 1 - cos(x);  // == 2*sin²(x/2)
+  const Expression V = RegionOfAttraction(*system, *context, options);
+
+  const double rho = (options.lyapunov_candidate / V).Evaluate({{x, 0.5}});
+  const double rho_expected = 2;
+  EXPECT_NEAR(rho, rho_expected, 1e-6);
+}
+
+// The true region of attraction of the pendulum is limited only by the
+// unstable fixed point at the top, so V<m*g*l is the ROA.
+GTEST_TEST(RegionOfAttractionTest, Pendulum) {
+  examples::pendulum::PendulumPlant<double> system;
+  auto context = system.CreateDefaultContext();
+  system.get_input_port().FixValue(context.get(), Vector1d{0.0});
+
+  RegionOfAttractionOptions options;
+  VectorX<Variable> x = symbolic::MakeVectorVariable(2, "x");
+  options.state_variables = x;
+  options.sin_cos_variables.insert(x[0]);
+
+  examples::pendulum::PendulumPlant<Expression> sym_system;
+  auto sym_context = sym_system.CreateDefaultContext();
+  sym_context->SetContinuousState(x.cast<Expression>());
+  options.lyapunov_candidate = sym_system.EvalKineticEnergy(*sym_context) +
+                               sym_system.EvalPotentialEnergy(*sym_context) +
+                               0.1 * sin(x[0]) * x[1];
+
+  const Expression V = RegionOfAttraction(system, *context, options);
+
+  context->SetContinuousState(Eigen::Vector2d(M_PI, 0));
+  const Expression V_expected =
+      options.lyapunov_candidate / system.EvalPotentialEnergy(*context);
+  std::cout << "V = " << V << std::endl;
+  std::cout << "V_expected = " << V_expected << std::endl;
 }
 
 }  // namespace

@@ -197,6 +197,7 @@ class SinCosVisitor {
 
   [[nodiscard]] Expression VisitDivision(const Expression& e,
                                          TrigStatus status) const {
+    // TODO(russt): Implement half-angle identities.
     DRAKE_THROW_UNLESS(status == kNotSinCos);
     return Substitute(get_first_argument(e)) /
            Substitute(get_second_argument(e));

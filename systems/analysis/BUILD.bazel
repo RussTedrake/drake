@@ -221,6 +221,7 @@ drake_cc_library(
     srcs = ["region_of_attraction.cc"],
     hdrs = ["region_of_attraction.h"],
     deps = [
+        "//common:symbolic_trigonometric_polynomial",
         "//math:continuous_lyapunov_equation",
         "//math:matrix_util",
         "//math:quadratic_form",
@@ -608,6 +609,7 @@ drake_cc_googletest(
     name = "region_of_attraction_test",
     deps = [
         ":region_of_attraction",
+        "//examples/pendulum:pendulum_plant",
         "//solvers:mosek_solver",
         "//systems/framework:diagram_builder",
         "//systems/primitives:constant_vector_source",

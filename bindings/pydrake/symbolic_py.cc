@@ -569,7 +569,7 @@ PYBIND11_MODULE(symbolic, m) {
       .def(
           "Evaluate",
           [](const Formula& self, const Environment::map& env) {
-            return self.Evaluate(Environment{env});
+            return self.Environment{env});
           },
           py::arg("env") = Environment::map{}, doc.Formula.Evaluate.doc_2args)
       .def(
