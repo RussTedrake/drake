@@ -47,6 +47,7 @@ drake_cc_library(
     #testonly=1,
     deps = [
         "//common:essential",
+        "//common/proto:call_python",
         #"//common/test_utilities:limit_malloc",
         "//systems/framework",
         "//systems/primitives:multilayer_perceptron",

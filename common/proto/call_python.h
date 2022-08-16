@@ -10,7 +10,7 @@
 /// Utilities for calling Python from C++ over an RPC.
 ///
 /// For command-line examples, see the documentation in `call_python_client.py`.
-/// For C++ examples, see `call_python_test.cc`.
+/// For C++ examples, see `call_python_server_test.cc`.
 
 namespace drake {
 namespace common {
@@ -25,7 +25,7 @@ void CallPythonInit(const std::string& filename);
 class PythonRemoteVariable;
 
 /// Calls a Python client with a given function and arguments, returning
-/// a handle to the result.  For example uses, see `call_python_test.cc`.
+/// a handle to the result.  For example uses, see `call_python_server_test.cc`.
 template <typename... Types>
 PythonRemoteVariable CallPython(const std::string& function_name,
                                 Types... args);

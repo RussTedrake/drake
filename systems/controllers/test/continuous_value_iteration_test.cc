@@ -61,6 +61,7 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
   options.learning_rate = 1e-4;
   options.epochs_per_visualization_callback = 10;
   options.max_threads = 2;
+  options.wandb_project = "cvi_double_integrator";
 
   int last_epoch{0};
   double last_loss{100};

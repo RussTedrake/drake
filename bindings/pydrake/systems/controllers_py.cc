@@ -85,7 +85,10 @@ PYBIND11_MODULE(controllers, m) {
           doc.ContinuousValueIterationOptions.zero_value_states.doc)
       .def_readwrite("max_threads",
           &ContinuousValueIterationOptions::max_threads,
-          doc.ContinuousValueIterationOptions.max_threads.doc);
+          doc.ContinuousValueIterationOptions.max_threads.doc)
+      .def_readwrite("wandb_project",
+          &ContinuousValueIterationOptions::wandb_project,
+          doc.ContinuousValueIterationOptions.wandb_project.doc);
 
   m.def("ContinuousValueIteration", &ContinuousValueIteration,
       py::arg("plant"), py::arg("plant_context"), py::arg("value"),
