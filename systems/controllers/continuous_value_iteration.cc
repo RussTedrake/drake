@@ -282,7 +282,7 @@ void ContinuousValueIteration(
                       options.target_network_smoothing_factor));
     CallPython("wandb.init",
               ToPythonKwargs("project", options.wandb_project, "config",
-                              wandb_config));
+                              wandb_config, "reinit", true));
   }
 
   const int num_threads = SelectNumberOfThreadsToUse(options.max_threads);
@@ -399,9 +399,13 @@ void ContinuousValueIteration(
           epoch, loss / options.optimization_steps_per_epoch);
     }
     if (!options.wandb_project.empty()) {
+      RowVectorXd J(N);
+      value.BatchOutput(*value_context, batch_state, &J);
       auto wandb_log = CallPython(
           "dict",
-          ToPythonKwargs("loss", loss / options.optimization_steps_per_epoch));
+          ToPythonKwargs("loss", loss / options.optimization_steps_per_epoch,
+                         "max(Jd)", Jd.maxCoeff(), "min(Jd)", Jd.minCoeff(),
+                         "mean(Jd)", Jd.mean(), "min(J)", J.minCoeff(), "max(J)", J.maxCoeff(), "mean((J-Jd) / abs(Jd))", ((J - Jd).array() / Jd.array().abs()).mean()));
       CallPython("wandb.log", wandb_log);
     }
 
