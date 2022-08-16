@@ -8,9 +8,10 @@
 #include <utility>
 #include <vector>
 
-#define LIMIT_MALLOC false
-
 #include "drake/common/text_logging.h"
+#include "drake/common/proto/call_python.h"
+
+#define LIMIT_MALLOC false
 
 #if LIMIT_MALLOC
 #include "drake/common/test_utilities/limit_malloc.h"
@@ -20,6 +21,8 @@ namespace drake {
 namespace systems {
 namespace controllers {
 
+using common::CallPython;
+using common::ToPythonKwargs;
 using Eigen::MatrixXd;
 using Eigen::RowVectorXd;
 using Eigen::VectorXd;
@@ -264,6 +267,24 @@ void ContinuousValueIteration(
   value.ValidateContext(*value_context);
   VectorXd R_diagonal_inv = (1.0 / R_diagonal.array()).matrix();
 
+  if (!options.wandb_project.empty()) {
+    CallPython("setvars", "wandb_project", options.wandb_project);
+    CallPython("eval",
+               "print(f'Publishing to wandb project {wandb_project}.')");
+    CallPython("exec", "import wandb");
+    auto wandb_config = CallPython(
+        "dict",
+        ToPythonKwargs("time_step", options.time_step, "discount_factor",
+                      options.discount_factor, "minibatch_size",
+                      options.minibatch_size, "optimization_steps_per_epoch",
+                      options.optimization_steps_per_epoch, "learning_rate",
+                      options.learning_rate, "target_network_smooth_factor",
+                      options.target_network_smoothing_factor));
+    CallPython("wandb.init",
+              ToPythonKwargs("project", options.wandb_project, "config",
+                              wandb_config));
+  }
+
   const int num_threads = SelectNumberOfThreadsToUse(options.max_threads);
   std::vector<ThreadWorker> worker;
   std::vector<Eigen::VectorBlock<VectorXd>> target_parameters;
@@ -377,6 +398,13 @@ void ContinuousValueIteration(
       options.visualization_callback(
           epoch, loss / options.optimization_steps_per_epoch);
     }
+    if (!options.wandb_project.empty()) {
+      auto wandb_log = CallPython(
+          "dict",
+          ToPythonKwargs("loss", loss / options.optimization_steps_per_epoch));
+      CallPython("wandb.log", wandb_log);
+    }
+
     target_parameters[0].noalias() =
         options.target_network_smoothing_factor * value_parameters +
         (1 - options.target_network_smoothing_factor) * target_parameters[0];

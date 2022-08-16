@@ -73,6 +73,15 @@ struct ContinuousValueIterationOptions {
    std::thread::hardware_concurrency()), use max_threads=std::nullopt.
    Otherwise, max_threads must be >= 1. */
   std::optional<int> max_threads{1};
+
+  /** If this string is non-empty, then ContinuousValueIteration will log
+  intermediate data to the named project.  You must run e.g.
+  ```
+  clear && rm -f /tmp/python_rpc && mkfifo /tmp/python_rpc && bazel run //common/proto:call_python_client_cli
+  ```
+  In another window for the results to be published.  Make sure you have done
+  `pip3 install wandb` and run `wandb login`. */
+  std::string wandb_project{};
 };
 
 }  // namespace controllers
