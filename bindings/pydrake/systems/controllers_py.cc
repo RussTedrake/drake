@@ -8,7 +8,7 @@
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/bindings/pydrake/symbolic_types_pybind.h"
 #include "drake/multibody/plant/multibody_plant.h"
-#include "drake/systems/controllers/continuous_value_iteration.h"
+#include "drake/systems/controllers/neural_value_iteration.h"
 #include "drake/systems/controllers/dynamic_programming.h"
 #include "drake/systems/controllers/finite_horizon_linear_quadratic_regulator.h"
 #include "drake/systems/controllers/inverse_dynamics.h"
@@ -37,65 +37,65 @@ PYBIND11_MODULE(controllers, m) {
   py::module::import("pydrake.systems.primitives");
   py::module::import("pydrake.trajectories");
 
-  py::class_<ContinuousValueIterationOptions>(m,
-      "ContinuousValueIterationOptions", py::dynamic_attr(),
-      doc.ContinuousValueIterationOptions.doc)
-      .def(ParamInit<ContinuousValueIterationOptions>())
-      .def_readwrite("time_step", &ContinuousValueIterationOptions::time_step,
-          doc.ContinuousValueIterationOptions.time_step.doc)
+  py::class_<NeuralValueIterationOptions>(m,
+      "NeuralValueIterationOptions", py::dynamic_attr(),
+      doc.NeuralValueIterationOptions.doc)
+      .def(ParamInit<NeuralValueIterationOptions>())
+      .def_readwrite("time_step", &NeuralValueIterationOptions::time_step,
+          doc.NeuralValueIterationOptions.time_step.doc)
       .def_readwrite("discount_factor",
-          &ContinuousValueIterationOptions::discount_factor,
-          doc.ContinuousValueIterationOptions.discount_factor.doc)
+          &NeuralValueIterationOptions::discount_factor,
+          doc.NeuralValueIterationOptions.discount_factor.doc)
       .def_readwrite("input_port_index",
-          &ContinuousValueIterationOptions::input_port_index,
-          doc.ContinuousValueIterationOptions.input_port_index.doc)
+          &NeuralValueIterationOptions::input_port_index,
+          doc.NeuralValueIterationOptions.input_port_index.doc)
       .def_readwrite("minibatch_size",
-          &ContinuousValueIterationOptions::minibatch_size,
-          doc.ContinuousValueIterationOptions.minibatch_size.doc)
-      .def_readwrite("max_epochs", &ContinuousValueIterationOptions::max_epochs,
-          doc.ContinuousValueIterationOptions.max_epochs.doc)
+          &NeuralValueIterationOptions::minibatch_size,
+          doc.NeuralValueIterationOptions.minibatch_size.doc)
+      .def_readwrite("max_epochs", &NeuralValueIterationOptions::max_epochs,
+          doc.NeuralValueIterationOptions.max_epochs.doc)
       .def_readwrite("optimization_steps_per_epoch",
-          &ContinuousValueIterationOptions::optimization_steps_per_epoch,
-          doc.ContinuousValueIterationOptions.optimization_steps_per_epoch.doc)
+          &NeuralValueIterationOptions::optimization_steps_per_epoch,
+          doc.NeuralValueIterationOptions.optimization_steps_per_epoch.doc)
       .def_readwrite("learning_rate",
-          &ContinuousValueIterationOptions::learning_rate,
-          doc.ContinuousValueIterationOptions.learning_rate.doc)
+          &NeuralValueIterationOptions::learning_rate,
+          doc.NeuralValueIterationOptions.learning_rate.doc)
       .def_readwrite("target_network_smoothing_factor",
-          &ContinuousValueIterationOptions::target_network_smoothing_factor,
-          doc.ContinuousValueIterationOptions.target_network_smoothing_factor
+          &NeuralValueIterationOptions::target_network_smoothing_factor,
+          doc.NeuralValueIterationOptions.target_network_smoothing_factor
               .doc)
       .def_readwrite("optimization_steps_per_epoch",
-          &ContinuousValueIterationOptions::optimization_steps_per_epoch,
-          doc.ContinuousValueIterationOptions.optimization_steps_per_epoch.doc)
+          &NeuralValueIterationOptions::optimization_steps_per_epoch,
+          doc.NeuralValueIterationOptions.optimization_steps_per_epoch.doc)
       .def_readwrite("visualization_callback",
-          &ContinuousValueIterationOptions::visualization_callback,
-          doc.ContinuousValueIterationOptions.visualization_callback.doc)
+          &NeuralValueIterationOptions::visualization_callback,
+          doc.NeuralValueIterationOptions.visualization_callback.doc)
       .def_readwrite("epochs_per_visualization_callback",
-          &ContinuousValueIterationOptions::epochs_per_visualization_callback,
-          doc.ContinuousValueIterationOptions.epochs_per_visualization_callback
+          &NeuralValueIterationOptions::epochs_per_visualization_callback,
+          doc.NeuralValueIterationOptions.epochs_per_visualization_callback
               .doc)
       .def_readwrite("input_lower_limit",
-          &ContinuousValueIterationOptions::input_lower_limit,
-          doc.ContinuousValueIterationOptions.input_lower_limit.doc)
+          &NeuralValueIterationOptions::input_lower_limit,
+          doc.NeuralValueIterationOptions.input_lower_limit.doc)
       .def_readwrite("input_upper_limit",
-          &ContinuousValueIterationOptions::input_upper_limit,
-          doc.ContinuousValueIterationOptions.input_upper_limit.doc)
+          &NeuralValueIterationOptions::input_upper_limit,
+          doc.NeuralValueIterationOptions.input_upper_limit.doc)
       .def_readwrite("zero_value_states",
-          &ContinuousValueIterationOptions::zero_value_states,
-          doc.ContinuousValueIterationOptions.zero_value_states.doc)
+          &NeuralValueIterationOptions::zero_value_states,
+          doc.NeuralValueIterationOptions.zero_value_states.doc)
       .def_readwrite("max_threads",
-          &ContinuousValueIterationOptions::max_threads,
-          doc.ContinuousValueIterationOptions.max_threads.doc)
+          &NeuralValueIterationOptions::max_threads,
+          doc.NeuralValueIterationOptions.max_threads.doc)
       .def_readwrite("wandb_project",
-          &ContinuousValueIterationOptions::wandb_project,
-          doc.ContinuousValueIterationOptions.wandb_project.doc);
+          &NeuralValueIterationOptions::wandb_project,
+          doc.NeuralValueIterationOptions.wandb_project.doc);
 
-  m.def("ContinuousValueIteration", &ContinuousValueIteration,
+  m.def("NeuralValueIteration", &NeuralValueIteration,
       py::arg("plant"), py::arg("plant_context"), py::arg("value"),
       py::arg("state_samples"), py::arg("state_cost"), py::arg("R_diagonal"),
       py::arg("value_context"), py::arg("generator"),
-      py::arg("options") = ContinuousValueIterationOptions(),
-      doc.ContinuousValueIteration.doc);
+      py::arg("options") = NeuralValueIterationOptions(),
+      doc.NeuralValueIteration.doc);
 
   {
     using Class = DynamicProgrammingOptions;

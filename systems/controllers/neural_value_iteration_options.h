@@ -8,10 +8,10 @@ namespace drake {
 namespace systems {
 namespace controllers {
 
-struct ContinuousValueIterationOptions {
+struct NeuralValueIterationOptions {
   /** Time step to use for any time integral approximations used in the
    algorithm. */
-  double time_step{0.01};
+  double time_step{0.05};
 
   /** A value between (0,1] that discounts future rewards. */
   double discount_factor{1.0};
@@ -54,14 +54,6 @@ struct ContinuousValueIterationOptions {
   % epochs_per_visualization_callback == 0`. */
   int epochs_per_visualization_callback{1};
 
-  /** Lower limit on the inputs. If non-empty, then it must be the size of the
-   * number of inputs of the plant. */
-  Eigen::VectorXd input_lower_limit{};
-
-  /** Upper limit on the inputs. If non-empty, then it must be the size of the
-   * number of inputs of the plant. */
-  Eigen::VectorXd input_upper_limit{};
-
   /** A matrix whose columns specify any states that are known to have zero
    * cost-to-go (e.g. a goal state). Specifying these can help to stabilize the
    * numerics of the algorithm; they are included in *every* minibatch. */
@@ -74,13 +66,14 @@ struct ContinuousValueIterationOptions {
    Otherwise, max_threads must be >= 1. */
   std::optional<int> max_threads{1};
 
-  /** If this string is non-empty, then ContinuousValueIteration will log
+  /** If this string is non-empty, then NeuralValueIteration will log
   intermediate data to the named project.  You must run e.g.
   ```
   clear && rm -f /tmp/python_rpc && mkfifo /tmp/python_rpc && bazel run //common/proto:call_python_client_cli
   ```
   In another window for the results to be published.  Make sure you have done
-  `pip3 install wandb` and run `wandb login`. */
+  `pip3 install wandb` and run `wandb login`. You must also be running outside
+  of the bazel sandbox. */
   std::string wandb_project{};
 };
 

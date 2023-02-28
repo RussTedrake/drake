@@ -1,4 +1,4 @@
-#include "drake/systems/controllers/continuous_value_iteration.h"
+#include "drake/systems/controllers/neural_value_iteration.h"
 
 #include <cmath>
 
@@ -18,7 +18,7 @@ namespace {
 // q̈ = u,  g(x,u) = x'Qx + u'Ru.
 // Note: we only expect the numerical solution to be very approximate, due to
 // discretization errors.
-GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
+GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   Eigen::Matrix2d A;
   A << 0., 1., 0., 0.;
   const Eigen::Vector2d B{0., 1.};
@@ -48,20 +48,26 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
       state_samples(1, index++) = qdot_samples[j];
     }
   }
+  Eigen::RowVectorXd input_samples = Eigen::VectorXd::LinSpaced(5, -1, 1);
 
   // Quadratic regulator state cost.
-  Eigen::RowVectorXd state_cost =
-      (state_samples.array() * (Q * state_samples).array()).colwise().sum();
+  Eigen::MatrixXd cost(state_samples.cols(), input_samples.cols());
+  for (int i = 0; i < state_samples.cols(); ++i) {
+    cost.row(i).setConstant(state_samples.col(i).dot(Q * state_samples.col(i)));
+  }
+  for (int i = 0; i < input_samples.cols(); ++i) {
+    cost.col(i).array() += input_samples.col(i).dot(R * input_samples.col(i));
+  }
 
-  ContinuousValueIterationOptions options;
+  NeuralValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.9;
   options.max_epochs = 500;
   options.target_network_smoothing_factor = 1;
   options.learning_rate = 1e-4;
   options.epochs_per_visualization_callback = 10;
-  options.max_threads = 2;
-  options.wandb_project = "cvi_double_integrator";
+  options.max_threads = 1;
+  options.wandb_project = "nvi_double_integrator";
 
   int last_epoch{0};
   double last_loss{100};
@@ -72,9 +78,9 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
     std::cout << "epoch " << epoch << ": loss = " << loss << std::endl;
   };
 
-  ContinuousValueIteration(plant, *plant_context, value, state_samples,
-                           state_cost, R, value_context.get(), &generator,
-                           options);
+  NeuralValueIteration(plant, *plant_context, value, state_samples,
+                       input_samples, options.time_step * cost,
+                       value_context.get(), &generator, options);
 
   EXPECT_EQ(last_epoch, options.max_epochs - 10);
   EXPECT_LE(last_loss, 1e-4);
@@ -102,13 +108,13 @@ GTEST_TEST(ContinuousValueIterationTest, DoubleIntegrator) {
 
 /*
 bazel build --compilation_mode=opt --copt=-g \
-  //systems/controllers:continuous_value_iteration_test
+  //systems/controllers:neural_value_iteration_test
 valgrind --tool=callgrind \
-  bazel-bin/systems/controllers/continuous_value_iteration_test \
+  bazel-bin/systems/controllers/neural_value_iteration_test \
   --gtest_filter='*Acrobot*'
 kcachegrind callgrind.out.[your_id]
 */
-GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
+GTEST_TEST(NeuralValueIterationTest, Acrobot) {
   examples::acrobot::AcrobotPlant<double> plant;
   auto plant_context = plant.CreateDefaultContext();
 
@@ -141,25 +147,31 @@ GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
       }
     }
   }
+  Eigen::RowVectorXd input_samples = Eigen::VectorXd::LinSpaced(5, -1, 1);
 
   // Quadratic regulator state cost.
-  const auto quadratic_cost =
-      [&Q](const Eigen::MatrixXd& states) -> Eigen::RowVectorXd {
-    Eigen::MatrixXd x = states;
-    x.row(0).array() -= M_PI;
-    return (x.array() * (Q * x).array()).colwise().sum();
-  };
-  Eigen::RowVectorXd state_cost = quadratic_cost(state_samples);
+  // Quadratic regulator state cost.
+  Eigen::MatrixXd cost(state_samples.cols(), input_samples.cols());
+  Eigen::Vector4d state;
+  for (int i = 0; i < state_samples.cols(); ++i) {
+    state = state_samples.col(i);
+    state[0] -= M_PI;
+    cost.row(i).setConstant(state.dot(Q * state));
+  }
+  for (int i = 0; i < input_samples.cols(); ++i) {
+    cost.col(i).array() += input_samples.col(i).dot(R * input_samples.col(i));
+  }
 
-  ContinuousValueIterationOptions options;
+  NeuralValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.99;
-  options.max_epochs = 5;
+  options.max_epochs = 500;
   options.optimization_steps_per_epoch = 10;
   options.target_network_smoothing_factor = 0.05;
   options.learning_rate = 1e-5;
   options.epochs_per_visualization_callback = 20;
   options.max_threads = std::nullopt;
+  options.wandb_project = "nvi_acrobot";
 
   int last_epoch{0};
   double last_loss{100};
@@ -170,9 +182,9 @@ GTEST_TEST(ContinuousValueIterationTest, Acrobot) {
     std::cout << "epoch " << epoch << ": loss = " << loss << std::endl;
   };
 
-  ContinuousValueIteration(plant, *plant_context, value, state_samples,
-                           state_cost, R, value_context.get(), &generator,
-                           options);
+  NeuralValueIteration(plant, *plant_context, value, state_samples,
+                       input_samples, cost, value_context.get(), &generator,
+                       options);
 }
 
 }  // namespace
