@@ -62,7 +62,7 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   NeuralValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.9;
-  options.max_epochs = 500;
+  options.max_epochs = 1000;
   options.target_network_smoothing_factor = 1;
   options.learning_rate = 1e-4;
   options.epochs_per_visualization_callback = 10;
@@ -75,7 +75,7 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
                                                              double loss) {
     last_epoch = epoch;
     last_loss = loss;
-    std::cout << "epoch " << epoch << ": loss = " << loss << std::endl;
+    log()->info("epoch {}: loss = {}", epoch, loss);
   };
 
   NeuralValueIteration(plant, *plant_context, value, state_samples,
@@ -169,7 +169,7 @@ GTEST_TEST(NeuralValueIterationTest, Acrobot) {
   options.optimization_steps_per_epoch = 10;
   options.target_network_smoothing_factor = 0.05;
   options.learning_rate = 1e-5;
-  options.epochs_per_visualization_callback = 20;
+  options.epochs_per_visualization_callback = 1;
   options.max_threads = std::nullopt;
   options.wandb_project = "nvi_acrobot";
 

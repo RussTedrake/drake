@@ -387,10 +387,14 @@ void MultilayerPerceptron<T>::BatchOutput(const Context<T>& context,
   DRAKE_DEMAND(Y->rows() == layers_[num_weights_]);
   DRAKE_DEMAND(Y->cols() == X.cols());
   const bool gradients = dYdX != nullptr;
-  if (gradients && layers_[num_weights_] != 1) {
-    throw std::logic_error(
-        "BatchOutput: dYdX != nullptr, but BatchOutput only supports gradients "
-        "when the output layer has size 1.");
+  if (gradients) {
+    if (layers_[num_weights_] != 1) {
+      throw std::logic_error(
+          "BatchOutput: dYdX != nullptr, but BatchOutput only supports "
+          "gradients when the output layer has size 1.");
+    }
+    DRAKE_DEMAND(dYdX->rows() == X.rows());
+    DRAKE_DEMAND(dYdX->cols() == X.cols());
   }
 
   BackPropData<T>& data =

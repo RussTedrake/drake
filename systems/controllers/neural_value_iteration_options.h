@@ -10,20 +10,20 @@ namespace controllers {
 
 struct NeuralValueIterationOptions {
   /** Time step to use for any time integral approximations used in the
-   algorithm. */
+  algorithm. */
   double time_step{0.05};
 
   /** A value between (0,1] that discounts future rewards. */
   double discount_factor{1.0};
 
-  /** For systems with multiple input ports, we must specify which input port is
-   being used in the control design. */
+  /** For systems with multiple input ports, we must specify which input port
+  is being used in the control design. */
   InputPortIndex input_port_index{0};
 
-  /** The size of the "minibatch"; a subset of states that will be updated
-   at each iteration of the algorithm. Set minibatch size to 0 to use all
-   samples on every iteration of the algorithm. */
-  int minibatch_size{32};
+  /** The size of the "minibatch"; a subset of states that will be updated at
+  each iteration of the algorithm. If minibatch_size=std::nullopt, then the
+  algorithm will use all of the data in a single batch. */
+  std::optional<int> minibatch_size{32};
 
   /** The maximum number of epochs. */
   int max_epochs{1000};

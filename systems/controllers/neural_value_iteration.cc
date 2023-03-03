@@ -23,6 +23,7 @@ namespace controllers {
 
 using common::CallPython;
 using common::ToPythonKwargs;
+using Eigen::Map;
 using Eigen::MatrixXd;
 using Eigen::RowVectorXd;
 using Eigen::VectorXd;
@@ -119,19 +120,22 @@ int SelectNumberOfThreadsToUse(const std::optional<int>& max_threads) {
 
 class ThreadWorker {
  public:
-  ThreadWorker(const Context<double>& model_plant_context)
-      : plant_context_(model_plant_context.Clone()) {}
+  ThreadWorker(const Context<double>& plant_context)
+      : plant_context_(plant_context.Clone()) {}
 
   void Precompute(const System<double>& plant,
                   const InputPort<double>& input_port,
                   const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
                   const Eigen::Ref<const Eigen::MatrixXd>& input_samples,
                   const NeuralValueIterationOptions& options,
-                  std::vector<MatrixXd>::iterator next_state_iter) {
+                  const std::vector<MatrixXd>::iterator next_state_iter) {
+    const int batch_size = state_samples.cols();
+    const int num_input_samples = input_samples.cols();
+
     std::vector<MatrixXd>::iterator iter = next_state_iter;
-    for (int si = 0; si < state_samples.cols(); ++si) {
+    for (int si = 0; si < batch_size; ++si) {
       plant_context_->SetContinuousState(state_samples.col(si));
-      for (int ui = 0; ui < input_samples.cols(); ++ui) {
+      for (int ui = 0; ui < num_input_samples; ++ui) {
         input_port.FixValue(plant_context_.get(), input_samples.col(ui));
         iter->col(ui) =
             state_samples.col(si) +
@@ -140,11 +144,87 @@ class ThreadWorker {
       }
       iter++;
     }
+
   }
 
  private:
   std::unique_ptr<Context<double>> plant_context_;
 };
+
+using BatchId = drake::Identifier<class FilterTag>;
+
+class MiniBatch {
+ public:
+  MiniBatch(const MultilayerPerceptron<double>& value_function,
+            const Context<double>& value_context, int num_states,
+            int num_input_samples, int batch_size)
+      : value_function_(value_function),
+        value_context_(value_context.Clone()),
+        num_input_samples_{num_input_samples},
+        batch_size_{batch_size},
+        dloss_dparams_(value_function.num_parameters()),
+        state_(num_states, batch_size),
+        next_state_(num_states, batch_size * num_input_samples),
+        cost_(num_input_samples, batch_size),
+        Jnext_(batch_size * num_input_samples),
+        Jd_(batch_size),
+        batch_id_(BatchId::get_new_id()) {}
+
+  void SetParameters(const Context<double>& value_context) {
+    value_function_.SetParameters(value_context_.get(),
+                                  value_function_.GetParameters(value_context));
+  }
+
+  void ComputeJd(const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
+                 const std::vector<MatrixXd>& next_state,
+                 const Eigen::Ref<const Eigen::MatrixXd>& cost,
+                 const std::vector<int>::iterator& state_index_iter,
+                 const NeuralValueIterationOptions& options) {
+    std::vector<int>::iterator iter = state_index_iter;
+    for (int i = 0; i < batch_size_; ++i) {
+      state_.col(i) = state_samples.col(*iter);
+      next_state_.middleCols(i * num_input_samples_, num_input_samples_) =
+          next_state[*iter];
+      cost_.col(i) = cost.row(*iter).transpose();
+      state_.col(i) = state_samples.col(*iter);
+      iter++;
+    }
+    value_function_.BatchOutput(*value_context_, next_state_, &Jnext_);
+    Jd_ = (cost_ + options.discount_factor *
+                       Map<MatrixXd>(Jnext_.data(), cost_.rows(), cost_.cols()))
+              .colwise()
+              .minCoeff();
+  }
+
+  void ValueIteration() {
+    loss_ = value_function_.BackpropagationMeanSquaredError(
+        *value_context_, state_, Jd_, &dloss_dparams_);
+  }
+
+  int batch_size() const { return batch_size_; }
+  double loss() const { return loss_; }
+  const VectorXd& dloss_dparams() const { return dloss_dparams_; }
+
+ private:
+  const MultilayerPerceptron<double>& value_function_;
+  std::unique_ptr<Context<double>> value_context_;
+  int num_input_samples_{};
+  int batch_size_{};
+  double loss_{0.0};
+  VectorXd dloss_dparams_{};
+
+  MatrixXd state_{};
+  MatrixXd next_state_{};
+  MatrixXd cost_{};
+  RowVectorXd Jnext_{};
+  RowVectorXd Jd_{};
+
+  BatchId batch_id_;
+};
+
+int DivideAndRoundUp(int x, int y) {
+  return (x + y - 1) / y;
+}
 
 }  // namespace
 
@@ -173,7 +253,7 @@ void NeuralValueIteration(
   DRAKE_DEMAND(cost.cols() == input_samples.cols());
   DRAKE_DEMAND(options.time_step > 0.0);
   DRAKE_DEMAND(options.discount_factor > 0.0 && options.discount_factor <= 1.0);
-  DRAKE_DEMAND(options.minibatch_size >= 0);
+  DRAKE_DEMAND(!options.minibatch_size || options.minibatch_size > 0);
   DRAKE_DEMAND(options.max_epochs > 0);
   DRAKE_DEMAND(options.optimization_steps_per_epoch > 0);
   DRAKE_DEMAND(options.learning_rate > 0);
@@ -192,11 +272,12 @@ void NeuralValueIteration(
     auto wandb_config = CallPython(
         "dict",
         ToPythonKwargs("time_step", options.time_step, "discount_factor",
-                      options.discount_factor, "minibatch_size",
-                      options.minibatch_size, "optimization_steps_per_epoch",
-                      options.optimization_steps_per_epoch, "learning_rate",
-                      options.learning_rate, "target_network_smooth_factor",
-                      options.target_network_smoothing_factor));
+                       options.discount_factor, "minibatch_size",
+                       options.minibatch_size.value_or(0),
+                       "optimization_steps_per_epoch",
+                       options.optimization_steps_per_epoch, "learning_rate",
+                       options.learning_rate, "target_network_smooth_factor",
+                       options.target_network_smoothing_factor));
     CallPython("wandb.init",
               ToPythonKwargs("project", options.wandb_project, "config",
                               wandb_config, "reinit", true));
@@ -226,7 +307,7 @@ void NeuralValueIteration(
     std::vector<MatrixXd>::iterator next_state_iter = next_state.begin();
     // Dispatch the worker threads.
     const int indices_per_thread =
-        std::ceil(static_cast<double>(num_state_samples) / num_threads);
+        DivideAndRoundUp(num_state_samples, num_threads);
     int state_index = 0;
     for (int i = 0; i < num_threads; ++i) {
       int segment_size = indices_per_thread;
@@ -255,17 +336,25 @@ void NeuralValueIteration(
   Adam optimizer(value_parameters);
   optimizer.set_learning_rate(options.learning_rate);
 
-  VectorXd dloss_dparams(value_function.num_parameters());
   double loss{0.0};
 
-  const int N =
-      options.minibatch_size > 0 ? options.minibatch_size : num_state_samples;
-  Eigen::VectorXi batch(N);
-  MatrixXd batch_state(num_states, N);
-  RowVectorXd batch_Jd(N);
-  RowVectorXd Jnext(num_input_samples);
+  const int minibatch_size =
+      options.minibatch_size ? *options.minibatch_size : num_state_samples;
+  const int num_mini_batches =
+      DivideAndRoundUp(num_state_samples, minibatch_size);
+  std::vector<MiniBatch> batch;
+  future.resize(num_mini_batches);
+  int state_index = 0;
+  for (int i=0; i<num_mini_batches; ++i) {
+      int batch_size = minibatch_size;
+      if (state_index + minibatch_size >= num_state_samples) {
+        batch_size = num_state_samples - state_index;
+      }
+      batch.emplace_back(MiniBatch(value_function, *target_context, num_states,
+                                   num_input_samples, batch_size));
+      state_index += batch_size;
+  }
 
-  std::uniform_int_distribution random_sample(0, num_state_samples - 1);
   std::vector<int> state_indices(num_state_samples);
   std::iota(state_indices.begin(), state_indices.end(), 0);
 
@@ -289,21 +378,49 @@ void NeuralValueIteration(
 #endif
     loss = 0.0;
     std::shuffle(state_indices.begin(), state_indices.end(), *generator);
+    std::vector<int>::iterator state_indices_iter = state_indices.begin();
+    if (num_threads == 1) {
+      for (int i = 0; i < num_mini_batches; ++i) {
+        batch[i].SetParameters(*target_context);
+        batch[i].ComputeJd(state_samples, next_state, cost, state_indices_iter,
+                           options);
+        state_indices_iter += batch[i].batch_size();
+      }
+    } else {
+      for (int i = 0; i < num_mini_batches; ++i) {
+        batch[i].SetParameters(*target_context);
+        future[i] =
+            std::async(std::launch::async, &MiniBatch::ComputeJd, &batch[i],
+                       std::ref(state_samples), std::ref(next_state),
+                       std::ref(cost), state_indices_iter, std::ref(options));
+        state_indices_iter += batch[i].batch_size();
+      }
+      // Wait for all computations to return.
+      for (int i = 0; i < num_mini_batches; ++i) {
+        future[i].wait();
+      }
+    }
+
     for (int ostep = 0; ostep < options.optimization_steps_per_epoch; ++ostep) {
-      int count = 0;
-      while (count < num_state_samples) { // minibatch
-      for (int i = 0; i < N; ++i) {
-          const int index = state_indices[count++ % num_state_samples];
-          batch_state.col(i) = state_samples.col(index);
-          // TODO: run the entire batch together, rather than looping here.
-          value_function.BatchOutput(*target_context, next_state[index],
-                                     &Jnext);
-          batch_Jd[i] =
-              (cost.row(index) + options.discount_factor * Jnext).minCoeff();
+      if (num_threads == 1) {
+        for (int i = 0; i < num_mini_batches; ++i) {
+          batch[i].SetParameters(*value_context);
+          batch[i].ValueIteration();
+          loss += batch[i].loss();
+          optimizer.Step(batch[i].dloss_dparams());
         }
-        loss += value_function.BackpropagationMeanSquaredError(
-            *value_context, batch_state, batch_Jd, &dloss_dparams);
-        optimizer.Step(dloss_dparams);
+      } else {
+        for (int i = 0; i < num_mini_batches; ++i) {
+          batch[i].SetParameters(*value_context);
+          future[i] = std::async(std::launch::async, &MiniBatch::ValueIteration,
+                                 &batch[i]);
+        }
+        // Wait for all computations to return.
+        for (int i = 0; i < num_mini_batches; ++i) {
+          future[i].wait();
+          loss += batch[i].loss();
+          optimizer.Step(batch[i].dloss_dparams());
+        }
       }
     }
     if (options.visualization_callback &&
@@ -323,6 +440,7 @@ void NeuralValueIteration(
     target_parameters.noalias() =
         options.target_network_smoothing_factor * value_parameters +
         (1 - options.target_network_smoothing_factor) * target_parameters;
+    
     optimizer.Reset();
   }
 
