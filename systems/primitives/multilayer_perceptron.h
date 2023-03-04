@@ -52,6 +52,7 @@ struct CalcLayersData;
  @endsystem
 
  @tparam_default_scalar
+ @tparam float
  @ingroup primitive_systems
 */
 template <typename T>
@@ -307,3 +308,4 @@ class MultilayerPerceptron final : public LeafSystem<T> {
 
 DRAKE_DECLARE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     class ::drake::systems::MultilayerPerceptron)
+extern template class ::drake::systems::MultilayerPerceptron<float>;

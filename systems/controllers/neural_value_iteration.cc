@@ -27,6 +27,7 @@ using Eigen::Map;
 using Eigen::MatrixXd;
 using Eigen::RowVectorXd;
 using Eigen::VectorXd;
+using Eigen::VectorXf;
 
 namespace {
 
@@ -34,17 +35,18 @@ namespace {
 // TODO(russt): Move this to drake::solvers and implement
 // SolverInterface.
 // TODO(russt): Implement weight decay and/or ams_grad.
+template <typename T>
 class Adam {
  public:
   // TODO(russt): This should be EigenPtr, but the MLP parameters currently
   // return a VectorBlock.
-  explicit Adam(Eigen::VectorBlock<VectorXd> params) : params_{params} {
-    exp_avgs_ = VectorXd::Zero(params_.size());
-    exp_avgs_sqs_ = VectorXd::Zero(params_.size());
+  explicit Adam(Eigen::VectorBlock<VectorX<T>> params) : params_{params} {
+    exp_avgs_ = VectorX<T>::Zero(params_.size());
+    exp_avgs_sqs_ = VectorX<T>::Zero(params_.size());
     denom_.resize(params_.size());
   }
 
-  void set_learning_rate(double learning_rate) {
+  void set_learning_rate(T learning_rate) {
     DRAKE_DEMAND(learning_rate > 0.0);
     learning_rate_ = learning_rate;
   }
@@ -55,7 +57,7 @@ class Adam {
     exp_avgs_sqs_.setZero();
   }
 
-  void Step(const Eigen::Ref<const VectorXd>& dloss_dparams) {
+  void Step(const Eigen::Ref<const VectorX<T>>& dloss_dparams) {
     num_steps_ += 1;
 
     const double bias_correction1 = 1 - std::pow(beta1_, num_steps_);
@@ -78,19 +80,19 @@ class Adam {
 
  private:
   // Parameters:
-  double learning_rate_{1e-3};
-  double beta1_{0.9};
-  double beta2_{0.999};
-  double eps_{1e-8};
+  T learning_rate_{1e-3};
+  T beta1_{0.9};
+  T beta2_{0.999};
+  T eps_{1e-8};
 
   // State:
   int num_steps_{0};
-  Eigen::VectorBlock<VectorXd> params_;
-  VectorXd exp_avgs_;
-  VectorXd exp_avgs_sqs_;
+  Eigen::VectorBlock<VectorX<T>> params_;
+  VectorX<T> exp_avgs_;
+  VectorX<T> exp_avgs_sqs_;
 
   // Temporary variables (to avoid dynamic memory allocations):
-  VectorXd denom_;
+  VectorX<T> denom_;
 };
 
 // Note: This is adapted from monte_carlo.cc.  We should probably put this
@@ -153,10 +155,11 @@ class ThreadWorker {
 
 using BatchId = drake::Identifier<class FilterTag>;
 
+template <typename T>
 class MiniBatch {
  public:
-  MiniBatch(const MultilayerPerceptron<double>& value_function,
-            const Context<double>& value_context, int num_states,
+  MiniBatch(const MultilayerPerceptron<T>& value_function,
+            const Context<T>& value_context, int num_states,
             int num_input_samples, int batch_size)
       : value_function_(value_function),
         value_context_(value_context.Clone()),
@@ -170,7 +173,7 @@ class MiniBatch {
         Jd_(batch_size),
         batch_id_(BatchId::get_new_id()) {}
 
-  void SetParameters(const Context<double>& value_context) {
+  void SetParameters(const Context<T>& value_context) {
     value_function_.SetParameters(value_context_.get(),
                                   value_function_.GetParameters(value_context));
   }
@@ -182,42 +185,40 @@ class MiniBatch {
                  const NeuralValueIterationOptions& options) {
     std::vector<int>::iterator iter = state_index_iter;
     for (int i = 0; i < batch_size_; ++i) {
-      state_.col(i) = state_samples.col(*iter);
+      state_.col(i) = state_samples.col(*iter).cast<float>();
       next_state_.middleCols(i * num_input_samples_, num_input_samples_) =
-          next_state[*iter];
-      cost_.col(i) = cost.row(*iter).transpose();
-      state_.col(i) = state_samples.col(*iter);
+          next_state[*iter].cast<float>(); // todo cast earlier?
+      cost_.col(i) = cost.row(*iter).transpose().cast<float>();
       iter++;
     }
     value_function_.BatchOutput(*value_context_, next_state_, &Jnext_);
-    Jd_ = (cost_ + options.discount_factor *
-                       Map<MatrixXd>(Jnext_.data(), cost_.rows(), cost_.cols()))
-              .colwise()
-              .minCoeff();
+    Jd_ =
+        (cost_ + options.discount_factor *
+                     Map<MatrixX<T>>(Jnext_.data(), cost_.rows(), cost_.cols()))
+            .colwise()
+            .minCoeff();
   }
 
-  void ValueIteration() {
-    loss_ = value_function_.BackpropagationMeanSquaredError(
-        *value_context_, state_, Jd_, &dloss_dparams_);
+  double ValueIteration(const Context<T>& value_context) {
+    return value_function_.BackpropagationMeanSquaredError(
+        value_context, state_, Jd_, &dloss_dparams_);
   }
 
   int batch_size() const { return batch_size_; }
-  double loss() const { return loss_; }
-  const VectorXd& dloss_dparams() const { return dloss_dparams_; }
+  const VectorX<T>& dloss_dparams() const { return dloss_dparams_; }
 
  private:
-  const MultilayerPerceptron<double>& value_function_;
-  std::unique_ptr<Context<double>> value_context_;
+  const MultilayerPerceptron<T>& value_function_;
+  std::unique_ptr<Context<T>> value_context_;
   int num_input_samples_{};
   int batch_size_{};
-  double loss_{0.0};
-  VectorXd dloss_dparams_{};
+  VectorX<T> dloss_dparams_{};
 
-  MatrixXd state_{};
-  MatrixXd next_state_{};
-  MatrixXd cost_{};
-  RowVectorXd Jnext_{};
-  RowVectorXd Jd_{};
+  MatrixX<T> state_{};
+  MatrixX<T> next_state_{};
+  MatrixX<T> cost_{};
+  RowVectorX<T> Jnext_{};
+  RowVectorX<T> Jd_{};
 
   BatchId batch_id_;
 };
@@ -230,11 +231,11 @@ int DivideAndRoundUp(int x, int y) {
 
 void NeuralValueIteration(
     const System<double>& plant, const Context<double>& plant_context,
-    const MultilayerPerceptron<double>& value_function,
+    const MultilayerPerceptron<float>& value_function,
     const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& input_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& cost,
-    Context<double>* value_context, RandomGenerator* generator,
+    Context<float>* value_context, RandomGenerator* generator,
     const NeuralValueIterationOptions& options) {
   const InputPort<double>& input_port =
       plant.get_input_port(options.input_port_index);
@@ -328,12 +329,12 @@ void NeuralValueIteration(
     }
   }
 
-  Eigen::VectorBlock<VectorXd> value_parameters =
+  Eigen::VectorBlock<VectorXf> value_parameters =
       value_function.GetMutableParameters(value_context);
   auto target_context  = value_context->Clone();
-  Eigen::VectorBlock<VectorXd> target_parameters =
+  Eigen::VectorBlock<VectorXf> target_parameters =
       value_function.GetMutableParameters(target_context.get());
-  Adam optimizer(value_parameters);
+  Adam<float> optimizer(value_parameters);
   optimizer.set_learning_rate(options.learning_rate);
 
   double loss{0.0};
@@ -342,7 +343,7 @@ void NeuralValueIteration(
       options.minibatch_size ? *options.minibatch_size : num_state_samples;
   const int num_mini_batches =
       DivideAndRoundUp(num_state_samples, minibatch_size);
-  std::vector<MiniBatch> batch;
+  std::vector<MiniBatch<float>> batch;
   future.resize(num_mini_batches);
   int state_index = 0;
   for (int i=0; i<num_mini_batches; ++i) {
@@ -390,8 +391,8 @@ void NeuralValueIteration(
       for (int i = 0; i < num_mini_batches; ++i) {
         batch[i].SetParameters(*target_context);
         future[i] =
-            std::async(std::launch::async, &MiniBatch::ComputeJd, &batch[i],
-                       std::ref(state_samples), std::ref(next_state),
+            std::async(std::launch::async, &MiniBatch<float>::ComputeJd,
+                       &batch[i], std::ref(state_samples), std::ref(next_state),
                        std::ref(cost), state_indices_iter, std::ref(options));
         state_indices_iter += batch[i].batch_size();
       }
@@ -402,25 +403,9 @@ void NeuralValueIteration(
     }
 
     for (int ostep = 0; ostep < options.optimization_steps_per_epoch; ++ostep) {
-      if (num_threads == 1) {
-        for (int i = 0; i < num_mini_batches; ++i) {
-          batch[i].SetParameters(*value_context);
-          batch[i].ValueIteration();
-          loss += batch[i].loss();
-          optimizer.Step(batch[i].dloss_dparams());
-        }
-      } else {
-        for (int i = 0; i < num_mini_batches; ++i) {
-          batch[i].SetParameters(*value_context);
-          future[i] = std::async(std::launch::async, &MiniBatch::ValueIteration,
-                                 &batch[i]);
-        }
-        // Wait for all computations to return.
-        for (int i = 0; i < num_mini_batches; ++i) {
-          future[i].wait();
-          loss += batch[i].loss();
-          optimizer.Step(batch[i].dloss_dparams());
-        }
+      for (int i = 0; i < num_mini_batches; ++i) {
+        loss = batch[i].ValueIteration(*value_context);
+        optimizer.Step(batch[i].dloss_dparams());
       }
     }
     if (options.visualization_callback &&

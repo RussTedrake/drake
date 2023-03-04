@@ -47,11 +47,11 @@ namespace controllers {
  */
 void NeuralValueIteration(
     const System<double>& plant, const Context<double>& plant_context,
-    const MultilayerPerceptron<double>& value_function,
+    const MultilayerPerceptron<float>& value_function,
     const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& input_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& cost,
-    Context<double>* value_context, RandomGenerator* generator,
+    Context<float>* value_context, RandomGenerator* generator,
     const NeuralValueIterationOptions& options =
         NeuralValueIterationOptions());
 

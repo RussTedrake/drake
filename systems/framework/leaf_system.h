@@ -2091,3 +2091,4 @@ class LeafSystem : public System<T> {
 
 DRAKE_DECLARE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     class ::drake::systems::LeafSystem)
+extern template class ::drake::systems::LeafSystem<float>;

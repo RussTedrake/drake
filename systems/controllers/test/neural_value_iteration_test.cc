@@ -30,7 +30,7 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   const Eigen::Matrix2d Q = Eigen::Matrix2d::Identity();
   const Vector1d R = Vector1d::Ones();
 
-  MultilayerPerceptron<double> value(
+  MultilayerPerceptron<float> value(
       {2, 16, 16, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
        PerceptronActivationType::kIdentity});
@@ -86,19 +86,21 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   EXPECT_LE(last_loss, 1e-4);
 
   // Compute the optimal solution.
-  Eigen::Matrix2d S = math::DiscreteAlgebraicRiccatiEquation(
-      std::sqrt(options.discount_factor) *
-          (Eigen::Matrix2d::Identity() + options.time_step * A),
-      options.time_step * B, options.time_step * Q,
-      options.time_step * R / options.discount_factor);
+  Eigen::Matrix2<float> S =
+      math::DiscreteAlgebraicRiccatiEquation(
+          std::sqrt(options.discount_factor) *
+              (Eigen::Matrix2d::Identity() + options.time_step * A),
+          options.time_step * B, options.time_step * Q,
+          options.time_step * R / options.discount_factor)
+          .cast<float>();
 
-  Eigen::Matrix2Xd test_samples(2, 5);
+  Eigen::Matrix2X<float> test_samples(2, 5);
   // clang-format off
   test_samples << 0, 4, 4, -4, -4,
                   0, 4, -4, 4, -4;
   // clang-format on
-  Eigen::RowVectorXd Jhat(test_samples.cols());
-  Eigen::RowVectorXd Jd = (test_samples.array() * (S * test_samples).array())
+  Eigen::RowVectorX<float> Jhat(test_samples.cols());
+  Eigen::RowVectorX<float> Jd = (test_samples.array() * (S * test_samples).array())
                               .colwise()
                               .sum()
                               .matrix();
@@ -121,7 +123,7 @@ GTEST_TEST(NeuralValueIterationTest, Acrobot) {
   Eigen::Matrix4d Q = Eigen::Vector4d(10, 10, 1, 1).asDiagonal();
   Vector1d R(1.0);
 
-  MultilayerPerceptron<double> value(
+  MultilayerPerceptron<float> value(
       {true, true, false, false}, {256, 256, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
        PerceptronActivationType::kIdentity});
