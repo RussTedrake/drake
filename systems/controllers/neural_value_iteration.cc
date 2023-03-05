@@ -40,7 +40,7 @@ class Adam {
  public:
   // TODO(russt): This should be EigenPtr, but the MLP parameters currently
   // return a VectorBlock.
-  explicit Adam(Eigen::VectorBlock<VectorX<T>> params) : params_{params} {
+  explicit Adam(VectorX<T>& params) : params_{params} {
     exp_avgs_ = VectorX<T>::Zero(params_.size());
     exp_avgs_sqs_ = VectorX<T>::Zero(params_.size());
     denom_.resize(params_.size());
@@ -87,7 +87,7 @@ class Adam {
 
   // State:
   int num_steps_{0};
-  Eigen::VectorBlock<VectorX<T>> params_;
+  VectorX<T>& params_;
   VectorX<T> exp_avgs_;
   VectorX<T> exp_avgs_sqs_;
 
@@ -158,8 +158,8 @@ using BatchId = drake::Identifier<class FilterTag>;
 template <typename T>
 class MiniBatch {
  public:
-  MiniBatch(const MultilayerPerceptron<T>& value_function,
-            const Context<T>& value_context, int num_states,
+  MiniBatch(const MultilayerPerceptron<double>& value_function,
+            const Context<double>& value_context, int num_states,
             int num_input_samples, int batch_size)
       : value_function_(value_function),
         value_context_(value_context.Clone()),
@@ -173,7 +173,7 @@ class MiniBatch {
         Jd_(batch_size),
         batch_id_(BatchId::get_new_id()) {}
 
-  void SetParameters(const Context<T>& value_context) {
+  void SetParameters(const Context<double>& value_context) {
     value_function_.SetParameters(value_context_.get(),
                                   value_function_.GetParameters(value_context));
   }
@@ -199,7 +199,7 @@ class MiniBatch {
             .minCoeff();
   }
 
-  double ValueIteration(const Context<T>& value_context) {
+  double ValueIteration(const Context<double>& value_context) {
     return value_function_.BackpropagationMeanSquaredError(
         value_context, state_, Jd_, &dloss_dparams_);
   }
@@ -208,8 +208,8 @@ class MiniBatch {
   const VectorX<T>& dloss_dparams() const { return dloss_dparams_; }
 
  private:
-  const MultilayerPerceptron<T>& value_function_;
-  std::unique_ptr<Context<T>> value_context_;
+  const MultilayerPerceptron<double>& value_function_;
+  std::unique_ptr<Context<double>> value_context_;
   int num_input_samples_{};
   int batch_size_{};
   VectorX<T> dloss_dparams_{};
@@ -231,11 +231,11 @@ int DivideAndRoundUp(int x, int y) {
 
 void NeuralValueIteration(
     const System<double>& plant, const Context<double>& plant_context,
-    const MultilayerPerceptron<float>& value_function,
+    const MultilayerPerceptron<double>& value_function,
     const Eigen::Ref<const Eigen::MatrixXd>& state_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& input_samples,
     const Eigen::Ref<const Eigen::MatrixXd>& cost,
-    Context<float>* value_context, RandomGenerator* generator,
+    Context<double>* value_context, RandomGenerator* generator,
     const NeuralValueIterationOptions& options) {
   const InputPort<double>& input_port =
       plant.get_input_port(options.input_port_index);
@@ -329,10 +329,10 @@ void NeuralValueIteration(
     }
   }
 
-  Eigen::VectorBlock<VectorXf> value_parameters =
+  VectorXf& value_parameters =
       value_function.GetMutableParameters(value_context);
   auto target_context  = value_context->Clone();
-  Eigen::VectorBlock<VectorXf> target_parameters =
+  VectorXf& target_parameters =
       value_function.GetMutableParameters(target_context.get());
   Adam<float> optimizer(value_parameters);
   optimizer.set_learning_rate(options.learning_rate);
@@ -351,8 +351,9 @@ void NeuralValueIteration(
       if (state_index + minibatch_size >= num_state_samples) {
         batch_size = num_state_samples - state_index;
       }
-      batch.emplace_back(MiniBatch(value_function, *target_context, num_states,
-                                   num_input_samples, batch_size));
+      batch.emplace_back(MiniBatch<float>(value_function, *target_context,
+                                          num_states, num_input_samples,
+                                          batch_size));
       state_index += batch_size;
   }
 
@@ -404,7 +405,7 @@ void NeuralValueIteration(
 
     for (int ostep = 0; ostep < options.optimization_steps_per_epoch; ++ostep) {
       for (int i = 0; i < num_mini_batches; ++i) {
-        loss = batch[i].ValueIteration(*value_context);
+        loss += batch[i].ValueIteration(*value_context);
         optimizer.Step(batch[i].dloss_dparams());
       }
     }

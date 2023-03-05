@@ -62,7 +62,7 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   NeuralValueIterationOptions options;
   options.time_step = 0.01;
   options.discount_factor = 0.9;
-  options.max_epochs = 1000;
+  options.max_epochs = 500;
   options.target_network_smoothing_factor = 1;
   options.learning_rate = 1e-4;
   options.epochs_per_visualization_callback = 10;

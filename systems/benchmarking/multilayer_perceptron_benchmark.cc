@@ -12,8 +12,11 @@ namespace systems {
 namespace {
 
 using Eigen::MatrixXd;
+using Eigen::MatrixXf;
 using Eigen::RowVectorXd;
+using Eigen::RowVectorXf;
 using Eigen::VectorXd;
+using Eigen::VectorXf;
 
 // TODO(jwnimmer-tri) Add benchmarking cases for input sin/cos features.
 
@@ -51,10 +54,10 @@ class Mlp : public benchmark::Fixture {
     mlp_ = std::make_unique<MultilayerPerceptron<double>>(layers);
 
     // Prepare the input/output matrix storage.
-    X_ = MatrixXd::Ones(num_inputs, batch_size);
+    X_ = MatrixXf::Ones(num_inputs, batch_size);
     Y_.resize(batch_size);
     dloss_dparams_.resize(mlp_->num_parameters());
-    Yd_ = RowVectorXd::Ones(batch_size);
+    Yd_ = RowVectorXf::Ones(batch_size);
     dYdX_.resize(num_inputs, batch_size);
 
     // Prepare a random context.
@@ -67,11 +70,11 @@ class Mlp : public benchmark::Fixture {
   std::unique_ptr<MultilayerPerceptron<double>> mlp_;
   std::unique_ptr<Context<double>> context_;
 
-  MatrixXd X_;
-  RowVectorXd Y_;
-  RowVectorXd dloss_dparams_;
-  RowVectorXd Yd_;
-  MatrixXd dYdX_;
+  MatrixXf X_;
+  RowVectorXf Y_;
+  RowVectorXf dloss_dparams_;
+  RowVectorXf Yd_;
+  MatrixXf dYdX_;
 };
 
 BENCHMARK_DEFINE_F(Mlp, Backprop)(benchmark::State& state) {  // NOLINT

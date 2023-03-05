@@ -47,7 +47,7 @@ void BasicTest() {
   // Default weights are all zero, so the output will be zero.
   mlp.get_input_port().FixValue(context.get(), Vector1<T>{2.0});
   EXPECT_TRUE(CompareMatrices(mlp.get_output_port().Eval(*context),
-                              Eigen::Vector4d::Zero(), 1e-14));
+                              Eigen::Vector4d::Zero(), 1e-7));
 
   Eigen::Matrix<S, 3, 2> W;
   W << 3, 4, 5, 6, 7, 8;
@@ -173,13 +173,13 @@ void CalcOutputTest(
   }
 
   if constexpr (std::is_same_v<T, double>) {
-    // CalcOutput<double> should not have any dynamic allocations.
-    drake::test::LimitMalloc guard({.max_num_allocations = 0});
+    // CalcOutput<double> should allocate only for the casts to float and back.
+    drake::test::LimitMalloc guard({.max_num_allocations = 2});
     mlp.get_output_port().Eval(*context);
   }
 
   EXPECT_TRUE(CompareMatrices(
-      mlp.get_output_port().Eval(*context).template cast<S>(), y, 1e-14));
+      mlp.get_output_port().Eval(*context).template cast<S>(), y, 1e-7));
 }
 
 GTEST_TEST(MultilayerPerceptronTest, CalcOutput) {
@@ -245,12 +245,12 @@ void BackpropTest(PerceptronActivationType type, bool use_sin_cos = false) {
                                                     &dloss_dparams);
 
   // Check that they give the same values.
-  EXPECT_NEAR(loss, loss_ad.value(), 1e-14);
+  EXPECT_NEAR(loss, loss_ad.value(), 5e-7);
   EXPECT_TRUE(CompareMatrices(dloss_dparams,
                               loss_ad.derivatives().size()
                                   ? loss_ad.derivatives().cast<float>()
                                   : VectorXf::Zero(mlp.num_parameters()).eval(),
-                              1e-14));
+                              5e-7));
 
   {  // A second call with the same size input should not allocate.
     drake::test::LimitMalloc guard({.max_num_allocations = 0});
@@ -283,7 +283,7 @@ GTEST_TEST(MultilayerPereceptronTest, BatchOutput) {
     }
     mlp.BatchOutput(*context, X, &Y);
 
-    EXPECT_TRUE(CompareMatrices(Y, Y_desired, 1e-14));
+    EXPECT_TRUE(CompareMatrices(Y, Y_desired, 1e-7));
 
     {  // A second call with the same size input should not allocate.
       drake::test::LimitMalloc guard({.max_num_allocations = 0});
@@ -323,8 +323,8 @@ GTEST_TEST(MultilayerPereceptronTest, BatchOutputWithGradients) {
     }
     mlp.BatchOutput(*context, X, &Y, &dYdX);
 
-    EXPECT_TRUE(CompareMatrices(Y, Y_desired, 1e-14));
-    EXPECT_TRUE(CompareMatrices(dYdX, dYdX_desired, 1e-14));
+    EXPECT_TRUE(CompareMatrices(Y, Y_desired, 5e-7));
+    EXPECT_TRUE(CompareMatrices(dYdX, dYdX_desired, 5e-7));
 
     {  // A second call with the same size input should not allocate.
       drake::test::LimitMalloc guard({.max_num_allocations = 0});
@@ -377,7 +377,7 @@ GTEST_TEST(MultilayerPerceptronTest, SinCosFeatures) {
   // clang-format on
   Eigen::Matrix<float, 1, 3> Y;
   mlp.BatchOutput(*context, X, &Y);
-  EXPECT_NEAR(Y[0], Y[1], 1e-14);
+  EXPECT_NEAR(Y[0], Y[1], 1e-7);
   EXPECT_GE(std::abs(Y[0] - Y[2]), 1e-3);
 
   // Check the gradients.
@@ -403,8 +403,8 @@ GTEST_TEST(MultilayerPerceptronTest, SinCosFeatures) {
   }
   mlp.BatchOutput(*context, X, &Y, &dYdX);
 
-  EXPECT_TRUE(CompareMatrices(Y, Y_desired, 1e-14));
-  EXPECT_TRUE(CompareMatrices(dYdX, dYdX_desired, 1e-14));
+  EXPECT_TRUE(CompareMatrices(Y, Y_desired, 1e-7));
+  EXPECT_TRUE(CompareMatrices(dYdX, dYdX_desired, 1e-7));
 
   {  // A second call with the same size input should not allocate.
     drake::test::LimitMalloc guard({.max_num_allocations = 0});

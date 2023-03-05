@@ -167,8 +167,8 @@ MultilayerPerceptron<T>::MultilayerPerceptron(
     calc_layers_data.Wx_plus_b[i] = VectorX<S>::Zero(layers_[i + 1]);
     calc_layers_data.Xn[i] = VectorX<S>::Zero(layers_[i + 1]);
   }
-//  calc_layers_cache_ = &this->DeclareCacheEntry(
-//      "calc_layers", calc_layers_data, &MultilayerPerceptron<T>::CalcLayers);
+  calc_layers_cache_ = &this->DeclareCacheEntry(
+      "calc_layers", calc_layers_data, &MultilayerPerceptron<T>::CalcLayers);
 
   // Declare cache entry for Backpropagation:
   BackPropData<S> backprop_data(num_weights_);
@@ -204,7 +204,8 @@ void MultilayerPerceptron<T>::SetRandomParameters(
     const Context<T>&, Parameters<T>* parameters,
     RandomGenerator* generator) const {
   std::uniform_real_distribution<double> uniform(-1.0, 1.0);
-  BasicVector<T>& params = parameters->get_mutable_numeric_parameter(0);
+  VectorX<S>& params =
+      parameters->template get_mutable_abstract_parameter<VectorX<S>>(0);
   for (int i = 0; i < num_weights_; ++i) {
     // We choose m here so that uniform(-m,m) has the desired standard
     // deviation √1/n, where n is the number of incoming connections.  The
@@ -463,8 +464,9 @@ void MultilayerPerceptron<T>::CalcOutput(const Context<T>& context,
                                          BasicVector<T>* y) const {
   this->ValidateContext(context);
   y->get_mutable_value() =
-      calc_layers_cache_->Eval<internal::CalcLayersData<T>>(context)
-          .Xn[num_weights_ - 1];
+      (calc_layers_cache_->Eval<internal::CalcLayersData<S>>(context)
+           .Xn[num_weights_ - 1])
+          .template cast<T>();
 }
 
 template <typename T>
