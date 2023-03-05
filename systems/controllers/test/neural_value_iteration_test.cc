@@ -124,15 +124,15 @@ GTEST_TEST(NeuralValueIterationTest, Acrobot) {
   Vector1d R(1.0);
 
   MultilayerPerceptron<double> value(
-      {true, true, false, false}, {256, 256, 1},
+      {true, true, false, false}, {32, 32, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
        PerceptronActivationType::kIdentity});
   auto value_context = value.CreateDefaultContext();
   RandomGenerator generator(123);
   value.SetRandomContext(value_context.get(), &generator);
 
-  Eigen::VectorXd q_samples = Eigen::VectorXd::LinSpaced(21, 0, 2 * M_PI);
-  Eigen::VectorXd qdot_samples = Eigen::VectorXd::LinSpaced(15, -5, 5);
+  Eigen::VectorXd q_samples = Eigen::VectorXd::LinSpaced(15, 0, 2 * M_PI);
+  Eigen::VectorXd qdot_samples = Eigen::VectorXd::LinSpaced(11, -5, 5);
   Eigen::Matrix4Xd state_samples(4, q_samples.size() * q_samples.size() *
                                         qdot_samples.size() *
                                         qdot_samples.size());
@@ -166,12 +166,13 @@ GTEST_TEST(NeuralValueIterationTest, Acrobot) {
 
   NeuralValueIterationOptions options;
   options.time_step = 0.01;
-  options.discount_factor = 0.99;
+  options.discount_factor = 0.95;
   options.max_epochs = 500;
   options.optimization_steps_per_epoch = 10;
   options.target_network_smoothing_factor = 0.05;
   options.learning_rate = 1e-5;
   options.epochs_per_visualization_callback = 1;
+  options.minibatch_size = 64;
   options.max_threads = std::nullopt;
   options.wandb_project = "nvi_acrobot";
 
