@@ -23,6 +23,24 @@ namespace internal {
 template <typename T>
 struct CalcLayersData;
 
+template <typename T>
+struct MultilayerPerceptronTraits {};
+
+template <>
+struct MultilayerPerceptronTraits<double> {
+  using DataType = float;
+};
+
+template <>
+struct MultilayerPerceptronTraits<AutoDiffXd> {
+  using DataType = AutoDiffXd;
+};
+
+template <>
+struct MultilayerPerceptronTraits<symbolic::Expression> {
+  using DataType = symbolic::Expression;
+};
+
 }  // namespace internal
 
 /** The MultilayerPerceptron (MLP) is one of the most common forms of neural
@@ -52,13 +70,14 @@ struct CalcLayersData;
  @endsystem
 
  @tparam_default_scalar
- @tparam float
  @ingroup primitive_systems
 */
 template <typename T>
 class MultilayerPerceptron final : public LeafSystem<T> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(MultilayerPerceptron)
+
+  using S = typename internal::MultilayerPerceptronTraits<T>::DataType;
 
   /** Constructs the MLP with the same activation type for every layer (except
    the output).
@@ -156,62 +175,61 @@ class MultilayerPerceptron final : public LeafSystem<T> {
 
   /** Returns a reference to all of the parameters (weights and biases) as a
    single vector. Use GetWeights and GetBiases to extract the components. */
-  const VectorX<T>& GetParameters(const Context<T>& context) const;
+  const VectorX<S>& GetParameters(const Context<T>& context) const;
 
   /** Returns a mutable reference to all of the parameters (weights and biases)
    as a single vector. */
-  Eigen::VectorBlock<VectorX<T>> GetMutableParameters(
-      Context<T>* context) const;
+  VectorX<S>& GetMutableParameters(Context<T>* context) const;
 
   /** Sets all of the parameters in the network (weights and biases) using a
    single vector. Use SetWeights and SetBiases to extract the components. */
   void SetParameters(Context<T>* context,
-                     const Eigen::Ref<const VectorX<T>>& params) const;
+                     const Eigen::Ref<const VectorX<S>>& params) const;
 
   /** Returns the weights used in the mapping from `layer` to `layer+1`.
    @pydrake_mkdoc_identifier{context} */
-  Eigen::Map<const MatrixX<T>> GetWeights(const Context<T>& context,
+  Eigen::Map<const MatrixX<S>> GetWeights(const Context<T>& context,
                                           int layer) const;
 
   /** Returns the biases used in the mapping from `layer` to `layer+1`.
    @pydrake_mkdoc_identifier{context} */
-  Eigen::Map<const VectorX<T>> GetBiases(const Context<T>& context,
+  Eigen::Map<const VectorX<S>> GetBiases(const Context<T>& context,
                                          int layer) const;
 
   /** Sets the weights in the `context` used in the mapping from `layer` to
    `layer+1`.
     @pydrake_mkdoc_identifier{context} */
   void SetWeights(Context<T>* context, int layer,
-                  const Eigen::Ref<const MatrixX<T>>& W) const;
+                  const Eigen::Ref<const MatrixX<S>>& W) const;
 
   /** Sets the biases in the `context` used in the mapping from `layer` to
    `layer+1`.
     @pydrake_mkdoc_identifier{context} */
   void SetBiases(Context<T>* context, int layer,
-                 const Eigen::Ref<const VectorX<T>>& b) const;
+                 const Eigen::Ref<const VectorX<S>>& b) const;
 
   /** Returns the weights in `params` used in the mapping from `layer` to
    `layer+1`.
    @pydrake_mkdoc_identifier{vector} */
-  Eigen::Map<const MatrixX<T>> GetWeights(
-      const Eigen::Ref<const VectorX<T>>& params, int layer) const;
+  Eigen::Map<const MatrixX<S>> GetWeights(
+      const Eigen::Ref<const VectorX<S>>& params, int layer) const;
 
   /** Returns the biases in `params` used in the mapping from `layer` to
    `layer+1`.
    @pydrake_mkdoc_identifier{vector} */
-  Eigen::Map<const VectorX<T>> GetBiases(
-      const Eigen::Ref<const VectorX<T>>& params, int layer) const;
+  Eigen::Map<const VectorX<S>> GetBiases(
+      const Eigen::Ref<const VectorX<S>>& params, int layer) const;
 
   /** Sets the weights in `params` used in the mapping from `layer` to
    `layer+1`.
    @pydrake_mkdoc_identifier{vector} */
-  void SetWeights(EigenPtr<VectorX<T>> params, int layer,
-                  const Eigen::Ref<const MatrixX<T>>& W) const;
+  void SetWeights(EigenPtr<VectorX<S>> params, int layer,
+                  const Eigen::Ref<const MatrixX<S>>& W) const;
 
   /** Sets the biases in `params` used in the mapping from `layer` to `layer+1`.
    @pydrake_mkdoc_identifier{vector} */
-  void SetBiases(EigenPtr<VectorX<T>> params, int layer,
-                 const Eigen::Ref<const VectorX<T>>& b) const;
+  void SetBiases(EigenPtr<VectorX<S>> params, int layer,
+                 const Eigen::Ref<const VectorX<S>>& b) const;
 
   /** Implements the Backpropagation algorithm for the MLP to compute the
    gradients of a scalar loss function with respect to the network parameters.
@@ -233,19 +251,19 @@ class MultilayerPerceptron final : public LeafSystem<T> {
    Note: It is expected that this algorithm will be used with T=double. It uses
    analytical gradients; AutoDiffXd is not required.
    */
-  T Backpropagation(const Context<T>& context,
-                    const Eigen::Ref<const MatrixX<T>>& X,
-                    const std::function<T(const Eigen::Ref<const MatrixX<T>>& Y,
-                                          EigenPtr<MatrixX<T>> dloss_dY)>& loss,
-                    EigenPtr<VectorX<T>> dloss_dparams) const;
+  S Backpropagation(const Context<T>& context,
+                    const Eigen::Ref<const MatrixX<S>>& X,
+                    const std::function<S(const Eigen::Ref<const MatrixX<S>>& Y,
+                                          EigenPtr<MatrixX<S>> dloss_dY)>& loss,
+                    EigenPtr<VectorX<S>> dloss_dparams) const;
 
   /** Calls Backpropagation with the mean-squared error loss function:
    loss = 1/N ∑ᵢ |yᵢ−yᵢᵈ|², where yᵈ is the desired values for y.
    See Backpropagation for details. */
-  T BackpropagationMeanSquaredError(
-      const Context<T>& context, const Eigen::Ref<const MatrixX<T>>& X,
-      const Eigen::Ref<const MatrixX<T>>& Y_desired,
-      EigenPtr<VectorX<T>> dloss_dparams) const;
+  S BackpropagationMeanSquaredError(
+      const Context<T>& context, const Eigen::Ref<const MatrixX<S>>& X,
+      const Eigen::Ref<const MatrixX<S>>& Y_desired,
+      EigenPtr<VectorX<S>> dloss_dparams) const;
 
   /** Evaluates the batch output for the MLP with a batch input vector. Each
    column of `X` represents an input, and each column of `Y` will be assigned
@@ -266,9 +284,9 @@ class MultilayerPerceptron final : public LeafSystem<T> {
    output.
    */
   void BatchOutput(const Context<T>& context,
-                   const Eigen::Ref<const MatrixX<T>>& X,
-                   EigenPtr<MatrixX<T>> Y,
-                   EigenPtr<MatrixX<T>> dYdX = nullptr) const;
+                   const Eigen::Ref<const MatrixX<S>>& X,
+                   EigenPtr<MatrixX<S>> Y,
+                   EigenPtr<MatrixX<S>> dYdX = nullptr) const;
 
  private:
   // Calculates y = f(x) for the entire network.
@@ -276,13 +294,13 @@ class MultilayerPerceptron final : public LeafSystem<T> {
 
   // Calculates the cache entries for the hidden units in the network.
   void CalcLayers(const Context<T>& context,
-                  internal::CalcLayersData<T>* data) const;
+                  internal::CalcLayersData<S>* data) const;
 
   // Calculates the (potentially batch) feature vector values.  When `X` is
   // size `num_inputs`-by-`N`, then `Features` is set to size
   // `layers()[0]`-by-`N`.
-  void CalcInputFeatures(const Eigen::Ref<const MatrixX<T>>& X,
-                         MatrixX<T>* input_features) const;
+  void CalcInputFeatures(const Eigen::Ref<const MatrixX<S>>& X,
+                         MatrixX<S>* input_features) const;
 
   int num_weights_;     // The number of weight matrices (number of layers -1 ).
   int num_parameters_;  // Total number of parameters.
@@ -308,4 +326,3 @@ class MultilayerPerceptron final : public LeafSystem<T> {
 
 DRAKE_DECLARE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     class ::drake::systems::MultilayerPerceptron)
-extern template class ::drake::systems::MultilayerPerceptron<float>;

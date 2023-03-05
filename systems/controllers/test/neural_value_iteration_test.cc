@@ -30,7 +30,7 @@ GTEST_TEST(NeuralValueIterationTest, DoubleIntegrator) {
   const Eigen::Matrix2d Q = Eigen::Matrix2d::Identity();
   const Vector1d R = Vector1d::Ones();
 
-  MultilayerPerceptron<float> value(
+  MultilayerPerceptron<double> value(
       {2, 16, 16, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
        PerceptronActivationType::kIdentity});
@@ -123,7 +123,7 @@ GTEST_TEST(NeuralValueIterationTest, Acrobot) {
   Eigen::Matrix4d Q = Eigen::Vector4d(10, 10, 1, 1).asDiagonal();
   Vector1d R(1.0);
 
-  MultilayerPerceptron<float> value(
+  MultilayerPerceptron<double> value(
       {true, true, false, false}, {256, 256, 1},
       {PerceptronActivationType::kReLU, PerceptronActivationType::kReLU,
        PerceptronActivationType::kIdentity});
