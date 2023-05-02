@@ -454,6 +454,7 @@ class TestMathematicalProgram(unittest.TestCase):
 
         result = mp.Solve(prog)
         self.assertTrue(np.allclose(result.GetSolution(x), x_expected))
+        prog.SetInitialGuess(x, x_expected)
 
         enum = zip(constraints, constraint_values_expected)
         for (constraint, value_expected) in enum:
@@ -467,6 +468,8 @@ class TestMathematicalProgram(unittest.TestCase):
             a = np.vstack((value_expected, value_expected)).T
             self.assertTrue(np.allclose(
                 value, np.vstack((value_expected, value_expected)).T))
+            value = prog.EvalBindingAtInitialGuess(constraint)
+            self.assertTrue(np.allclose(value, value_expected))
 
         enum = zip(costs, cost_values_expected)
         for (cost, value_expected) in enum:

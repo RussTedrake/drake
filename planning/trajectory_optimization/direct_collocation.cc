@@ -132,7 +132,8 @@ DirectCollocationConstraint::DirectCollocationConstraint(
 }
 
 void DirectCollocationConstraint::CalcDynamics(
-    const AutoDiffVecXd& x_with_dvars, const AutoDiffVecXd& u_with_dvars,
+    const Eigen::Ref<const AutoDiffVecXd>& x_with_dvars,
+    const Eigen::Ref<const AutoDiffVecXd>& u_with_dvars,
     Context<AutoDiffXd>* context, AutoDiffVecXd* xdot_with_dvars) const {
   // To have cache hits, we must match not only the x and u values, but also
   // the derivatives. To get cache hits even when dvars are different, we use

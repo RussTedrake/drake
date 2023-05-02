@@ -56,6 +56,9 @@ class MultipleShooting {
   /// @exclude_from_pydrake_mkdoc{This overload is not bound.}
   const solvers::MathematicalProgram& prog() const { return prog_; }
 
+  /// Returns the fixed number of samples, N.
+  int num_samples() const { return N_; }
+
   /// Returns the decision variable associated with the time step, h, at time
   /// index @p index.
   /// @throws std::exception if time steps are not declared as decision
