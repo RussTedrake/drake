@@ -564,12 +564,10 @@ class ExpressionCost : public Cost {
    * Any Binding that connects this constraint to decision variables should
    * pass this list of variables to the Binding.
    */
-  const VectorXDecisionVariable& vars() const { return vars_; }
+  const VectorXDecisionVariable& vars() const;
 
   /** @return the symbolic expression. */
-  const symbolic::Expression& expression() const {
-    return expression_;
-  }
+  const symbolic::Expression& expression() const;
 
  protected:
   void DoEval(const Eigen::Ref<const Eigen::VectorXd>& x,
@@ -585,15 +583,7 @@ class ExpressionCost : public Cost {
                           const VectorX<symbolic::Variable>&) const override;
 
  private:
-  symbolic::Expression expression_{};
-  RowVectorX<symbolic::Expression> derivatives_{0};
-
-  // map_var_to_index_[vars_(i).get_id()] = i.
-  VectorXDecisionVariable vars_{0};
-  std::unordered_map<symbolic::Variable::Id, int> map_var_to_index_;
-
-  // Only for caching, does not carrying hidden state.
-  mutable symbolic::Environment environment_;
+  std::unique_ptr<EvaluatorBase> evaluator_;
 };
 
 /**
