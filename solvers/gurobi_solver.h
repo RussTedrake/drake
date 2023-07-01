@@ -189,13 +189,6 @@ class GurobiSolver final : public SolverBase {
   static std::string UnsatisfiedProgramAttributes(const MathematicalProgram&);
   //@}
 
-  // Returns true if this solver has acquired a license during a Solve(), and
-  // this license was confirmed to be tied to the local host. If the license can
-  // be confirmed to be local, then it will never be destroyed. If the license
-  // cannot be confirmed to be local, then the license will stay valid as long
-  // as at least one shared_ptr returned by AcquireLicense() is alive.
-  bool has_acquired_local_license() const;
-
   // A using-declaration adds these methods into our class's Doxygen.
   using SolverBase::Solve;
 
