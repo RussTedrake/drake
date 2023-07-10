@@ -327,6 +327,21 @@ GTEST_TEST(MinimumValueConstraintTests, EvalNoValuesTest2) {
                                        AutoDiffVecXd::Zero(num_vars), kEps);
 }
 
+GTEST_TEST(MinimumValueConstraintTests, EvalNoValuesTest3) {
+  // Test with both the lower and the upper bound on the minimal value,
+  // max_num_values > 0.
+  int num_vars{5};
+  int max_num_values{3};
+  double minimum_value_lower{0.05};
+  double minimum_value_upper{0.1};
+  double influence_value{0.2};
+  MinimumValueConstraint dut_no_values(
+      num_vars, minimum_value_lower, minimum_value_upper, influence_value,
+      max_num_values, &ReturnNoValues<AutoDiffXd>);
+  test::CheckConstraintEvalNonsymbolic(dut_no_values,
+                                       AutoDiffVecXd::Zero(num_vars), kEps);
+}
+
 // Verify that Eval() throws for symbolic inputs.
 GTEST_TEST(MinimumValueConstraintTests, EvalSymbolicTest) {
   int num_vars{5};

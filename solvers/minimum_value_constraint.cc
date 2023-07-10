@@ -253,7 +253,7 @@ void MinimumValueConstraint::DoEvalGeneric(
     const Eigen::Ref<const VectorX<T>>& x, VectorX<T>* y) const {
   y->resize(num_constraints());
 
-  // Indices for the one or two possible constraints. Infinite bound valuess map
+  // Indices for the one or two possible constraints. Infinite bound values map
   // to invalid index values (-1).
   // SoftOverMax(φ((vᵢ - v_influence)/(v_influence - vₘᵢₙ_lower)) / φ(-1)) ≤ 1.
   const int y_lower_index = std::isfinite(minimum_value_lower_) ? 0 : -1;

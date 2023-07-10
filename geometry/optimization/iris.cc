@@ -16,6 +16,7 @@
 #include "drake/geometry/optimization/minkowski_sum.h"
 #include "drake/geometry/optimization/vpolytope.h"
 #include "drake/math/autodiff_gradient.h"
+#include "drake/multibody/inverse_kinematics/minimum_distance_constraint.h"
 #include "drake/multibody/plant/multibody_plant.h"
 #include "drake/solvers/choose_best_solver.h"
 #include "drake/solvers/ipopt_solver.h"
@@ -354,7 +355,9 @@ class CounterExampleProgram {
     prog_.SetInitialGuess(q_, q_guess);
     solvers::MathematicalProgramResult result;
     solver.Solve(prog_, std::nullopt, std::nullopt, &result);
-    if (result.is_success()) {
+    if (result.is_success()) {// ||
+//        result.get_solver_details<solvers::SnoptSolver>().info == 43) {
+      // We handle Snopt error 43 as a hack until #14789 is resolved.
       *closest = result.GetSolution(q_);
       return true;
     }
@@ -468,60 +471,48 @@ HPolyhedron IrisInConfigurationSpace(const MultibodyPlant<double>& plant,
   Hyperellipsoid E = options.starting_ellipse.value_or(
       Hyperellipsoid::MakeHypersphere(kEpsilonEllipsoid, seed));
 
-  // Make all of the convex sets and supporting quantities.
-  auto query_object =
-      plant.get_geometry_query_input_port().Eval<QueryObject<double>>(context);
-  const SceneGraphInspector<double>& inspector = query_object.inspector();
-  IrisConvexSetMaker maker(query_object, inspector.world_frame_id());
-  std::unordered_map<GeometryId, copyable_unique_ptr<ConvexSet>> sets{};
-  std::unordered_map<GeometryId, const multibody::Frame<double>*> frames{};
-  const std::unordered_set<GeometryId> geom_ids = inspector.GetGeometryIds(
-      GeometrySet(inspector.GetAllGeometryIds()), Role::kProximity);
-  copyable_unique_ptr<ConvexSet> temp_set;
-  for (GeometryId geom_id : geom_ids) {
-    // Make all sets in the local geometry frame.
-    FrameId frame_id = inspector.GetFrameId(geom_id);
-    maker.set_reference_frame(frame_id);
-    maker.set_geometry_id(geom_id);
-    inspector.GetShape(geom_id).Reify(&maker, &temp_set);
-    sets.emplace(geom_id, std::move(temp_set));
-    frames.emplace(geom_id, &plant.GetBodyFromFrameId(frame_id)->body_frame());
-  }
-
-  auto pairs = inspector.GetCollisionCandidates();
-  const int n = static_cast<int>(pairs.size());
-  auto same_point_constraint =
-      std::make_shared<internal::SamePointConstraint>(&plant, context);
-  std::map<std::pair<GeometryId, GeometryId>, std::vector<VectorXd>>
-      counter_examples;
-
-  // As a surrogate for the true objective, the pairs are sorted by the distance
-  // between each collision pair from the seed point configuration. This could
-  // improve computation times and produce regions with fewer faces.
-  std::vector<GeometryPairWithDistance> sorted_pairs;
-  for (const auto& [geomA, geomB] : pairs) {
-    const double distance =
-        query_object.ComputeSignedDistancePairClosestPoints(geomA, geomB)
-            .distance;
-    if (distance < 0.0) {
-      throw std::runtime_error(
-          fmt::format("The seed point is in collision; geometry {} is in "
-                      "collision with geometry {}",
-                      inspector.GetName(geomA), inspector.GetName(geomB)));
+  {
+    auto query_object =
+        plant.get_geometry_query_input_port().Eval<QueryObject<double>>(
+            context);
+    auto penetration = query_object.ComputePointPairPenetration();
+    if (penetration.size() > 0) {
+      const SceneGraphInspector<double>& inspector = query_object.inspector();
+      std::string message = "The seed point is in collision.\n";
+      for (const auto& pair : penetration) {
+        message += fmt::format("  {} and {} are in collision.\n",
+                               inspector.GetName(pair.id_A),
+                               inspector.GetName(pair.id_B));
+      }
+      throw std::runtime_error(message);
     }
-    sorted_pairs.emplace_back(geomA, geomB, distance);
   }
-  std::sort(sorted_pairs.begin(), sorted_pairs.end());
 
   // On each iteration, we will build the collision-free polytope represented as
   // {x | A * x <= b}.  Here we pre-allocate matrices with a generous maximum
   // size.
+  const int num_collision_pairs = plant.get_geometry_query_input_port()
+                                      .Eval<QueryObject<double>>(context)
+                                      .inspector()
+                                      .GetCollisionCandidates()
+                                      .size();
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(
-      P.A().rows() + 2 * n + nc, nq);
-  VectorXd b(P.A().rows() + 2 * n + nc);
+      P.A().rows() + 2 * num_collision_pairs + nc, nq);
+  VectorXd b(P.A().rows() + 2 * num_collision_pairs + nc);
   A.topRows(P.A().rows()) = P.A();
   b.head(P.A().rows()) = P.b();
   int num_initial_constraints = P.A().rows();
+
+  // TODO(russt): Make this an option. Larger will increase the cost of each
+  // optimization, but may require fewer samples.
+  const double kInfluenceDistance = 1.0;  // meters
+  // TODO(russt): Update the IRIS entrypoint to take a mutable context.
+  Context<double>& mutable_context = const_cast<Context<double>&>(context);
+  internal::ClosestCollisionProgram closest_collision_prog(
+      std::make_shared<multibody::MinimumDistanceConstraint>(
+          &plant, -std::numeric_limits<double>::infinity(), 0.01, &mutable_context,
+          solvers::QuadraticallySmoothedHingeLoss, kInfluenceDistance),
+      E, A.topRows(num_initial_constraints), b.head(num_initial_constraints));
 
   std::shared_ptr<CounterExampleConstraint> counter_example_constraint{};
   std::unique_ptr<CounterExampleProgram> counter_example_prog{};
@@ -646,39 +637,17 @@ HPolyhedron IrisInConfigurationSpace(const MultibodyPlant<double>& plant,
 
     // Use the fast nonlinear optimizer until it fails
     // num_collision_infeasible_samples consecutive times.
-    for (const auto& pair_w_distance : sorted_pairs) {
-      std::pair<GeometryId, GeometryId> geom_pair(pair_w_distance.geomA,
-                                                  pair_w_distance.geomB);
+    if (num_collision_pairs > 0) {
       int consecutive_failures = 0;
-      internal::ClosestCollisionProgram prog(
-          same_point_constraint, *frames.at(pair_w_distance.geomA),
-          *frames.at(pair_w_distance.geomB), *sets.at(pair_w_distance.geomA),
-          *sets.at(pair_w_distance.geomB), E, A.topRows(num_constraints),
-          b.head(num_constraints));
-      std::vector<VectorXd> prev_counter_examples =
-          std::move(counter_examples[geom_pair]);
-      // Sort by the current ellipsoid metric.
-      std::sort(prev_counter_examples.begin(), prev_counter_examples.end(),
-                [&E](const VectorXd& x, const VectorXd& y) {
-                  return (E.A() * x - E.center()).squaredNorm() <
-                         (E.A() * y - E.center()).squaredNorm();
-                });
-      std::vector<VectorXd> new_counter_examples;
-      int counter_example_searches_for_this_pair = 0;
+      int num_collision_searches = 0;
       bool warned_many_searches = false;
+      closest_collision_prog.UpdateEllipsoid(E);
+      closest_collision_prog.UpdatePolytope(A.topRows(num_constraints),
+                                            b.head(num_constraints));
       while (consecutive_failures < options.num_collision_infeasible_samples) {
-        // First use previous counter-examples for this pair as the seeds.
-        if (counter_example_searches_for_this_pair <
-            ssize(prev_counter_examples)) {
-          guess = prev_counter_examples[counter_example_searches_for_this_pair];
-        } else {
-          MakeGuessFeasible(P_candidate, &guess);
-          guess = P_candidate.UniformSample(&generator, guess);
-        }
-        ++counter_example_searches_for_this_pair;
-        if (prog.Solve(*solver, guess, &closest)) {
+        ++num_collision_searches;
+        if (closest_collision_prog.Solve(*solver, guess, &closest)) {
           consecutive_failures = 0;
-          new_counter_examples.emplace_back(closest);
           AddTangentToPolytope(E, closest, options.configuration_space_margin,
                                &A, &b, &num_constraints);
           P_candidate =
@@ -689,40 +658,33 @@ HPolyhedron IrisInConfigurationSpace(const MultibodyPlant<double>& plant,
                 A.row(num_constraints - 1) * seed <= b(num_constraints - 1);
             if (!seed_point_requirement) break;
           }
-          prog.UpdatePolytope(A.topRows(num_constraints),
-                              b.head(num_constraints));
-        } else if (counter_example_searches_for_this_pair >
-                   ssize(counter_examples[geom_pair])) {
-          // Only count the failures once we start the random guesses.
+          closest_collision_prog.UpdatePolytope(A.topRows(num_constraints),
+                                                b.head(num_constraints));
+        } else {
           ++consecutive_failures;
         }
         if (!warned_many_searches &&
-            counter_example_searches_for_this_pair -
-                    ssize(counter_examples[geom_pair]) >=
+            num_collision_searches >=
                 10 * options.num_collision_infeasible_samples) {
           warned_many_searches = true;
           log()->info(
-              " Checking {} against {} has already required {} counter-example "
+              " Removing collisions has already required {} counter-example "
               "searches; still searching...",
-              inspector.GetName(pair_w_distance.geomA),
-              inspector.GetName(pair_w_distance.geomB),
-              counter_example_searches_for_this_pair);
+              num_collision_searches);
         }
       }
-      counter_examples[geom_pair] = std::move(new_counter_examples);
       if (warned_many_searches) {
         log()->info(
-            " Finished checking {} against {} after {} counter-example "
+            " Finished removing collisions after {} counter-example "
             "searches.",
-            inspector.GetName(pair_w_distance.geomA),
-            inspector.GetName(pair_w_distance.geomB),
-            counter_example_searches_for_this_pair);
+            num_collision_searches);
       }
-      if (!seed_point_requirement) break;
     }
 
     if (!seed_point_requirement) break;
 
+    // TODO(russt): Use MinimumValueConstraint to take the disjunction of these
+    // constraints, and merge it into the closest_collision_prog.
     if (options.prog_with_additional_constraints) {
       counter_example_prog->UpdatePolytope(A.topRows(num_constraints),
                                            b.head(num_constraints));

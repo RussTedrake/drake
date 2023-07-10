@@ -180,8 +180,8 @@ drake_cc_library(
     hdrs = ["iris_internal.h"],
     deps = [
         ":convex_set",
-        "//multibody/plant",
         "//solvers:mathematical_program",
+        "//solvers:snopt_solver",
         "//solvers:solve",
     ],
 )
@@ -195,6 +195,7 @@ drake_cc_library(
         ":iris_internal",
         "//common:name_value",
         "//geometry:scene_graph",
+        "//multibody/inverse_kinematics:kinematic_evaluators",
         "//multibody/plant",
         "//solvers:choose_best_solver",
         "//solvers:ipopt_solver",

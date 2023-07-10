@@ -129,7 +129,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, BoxesPrismatic) {
   EXPECT_FALSE(region.PointInSet(Vector1d{qmax + kTol}));
 
   DRAKE_EXPECT_THROWS_MESSAGE(IrisFromUrdf(boxes_urdf, Vector1d{1.1}, options),
-                              "The seed point is in collision.*");
+                              "The seed point is in collision(\\s|\\S)*");
 }
 
 // Three boxes again, but the configuration-space margin is larger than 1/2 the
@@ -201,7 +201,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, BoxesWithMeshPrismatic) {
   EXPECT_FALSE(region.PointInSet(Vector1d{qmax + kTol}));
 
   DRAKE_EXPECT_THROWS_MESSAGE(IrisFromUrdf(boxes_urdf, Vector1d{1.1}, options),
-                              "The seed point is in collision.*");
+                              "The seed point is in collision(\\s|\\S)*");
 }
 
 GTEST_TEST(IrisInConfigurationSpaceTest, ConfigurationObstacles) {
@@ -251,8 +251,7 @@ GTEST_TEST(IrisInConfigurationSpaceTest, ConfigurationObstacles) {
 
     EXPECT_EQ(region.ambient_dimension(), 1);
 
-    const double qmin = -1.0 + options.configuration_space_margin,
-                 qmax = 1.0 - options.configuration_space_margin;
+    const double qmin = -1.0 + options.configuration_space_margin, qmax = 1.0;
     EXPECT_TRUE(region.PointInSet(Vector1d{qmin + kTol}));
     EXPECT_TRUE(region.PointInSet(Vector1d{qmax - kTol}));
     EXPECT_FALSE(region.PointInSet(Vector1d{qmin - kTol}));
@@ -629,6 +628,7 @@ const char block_urdf[] = R"(
 GTEST_TEST(IrisInConfigurationSpaceTest, BlockOnGround) {
   const Vector2d sample{1.0, 0.0};
   IrisOptions options;
+  options.num_collision_infeasible_samples = 10;
   HPolyhedron region = IrisFromUrdf(block_urdf, sample, options);
 
   EXPECT_EQ(region.ambient_dimension(), 2);

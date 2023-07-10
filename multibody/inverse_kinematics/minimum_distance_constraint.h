@@ -55,10 +55,10 @@ This constraint should be bound to decision variables corresponding to the
 configuration vector, q, of the associated MultibodyPlant.
 
 The formulation of the constraint is
-
+<pre>
 SmoothOverMax( φ((dᵢ(q) - d_influence)/(d_influence - lb)) / φ(-1) ) ≤ 1
 SmoothUnderMax( φ((dᵢ(q) - d_influence)/(d_influence - ub)) / φ(-1) ) ≥ 1
-
+</pre>
 where dᵢ(q) is the signed distance of the i-th pair, lb is the minimum
 allowable distance, d_influence is the "influence distance" (the distance below
 which a pair of geometries influences the constraint), φ is a
