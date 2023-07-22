@@ -470,6 +470,13 @@ struct Gamepad {
   MSGPACK_DEFINE_MAP(index, button_values, axes);
 };
 
+struct CaptureImage {
+  std::string type{"capture_image"};
+  int xres;
+  int yres;
+  MSGPACK_DEFINE_MAP(type, xres, yres);
+};
+
 struct UserInterfaceEvent {
   std::string type;
   std::string name;

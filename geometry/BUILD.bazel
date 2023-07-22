@@ -463,6 +463,7 @@ drake_cc_library(
         "//geometry/proximity:triangle_surface_mesh",
         "//math:geometric_transform",
         "//perception:point_cloud",
+        "//systems/sensors:image",
     ],
     deps = [
         "//common:drake_export",
@@ -471,6 +472,7 @@ drake_cc_library(
         "//common:scope_exit",
         "//common:unused",
         "@common_robotics_utilities",
+        "@libpng",
         "@msgpack_internal//:msgpack",
         "@stduuid_internal//:stduuid",
         "@uwebsockets",

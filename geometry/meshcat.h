@@ -16,6 +16,8 @@
 #include "drake/math/rigid_transform.h"
 // TODO(russt): Move point_cloud.h to a more central location.
 #include "drake/perception/point_cloud.h"
+// TODO(russt): Move image.h to a more central location.
+#include "drake/systems/sensors/image.h"
 
 namespace drake {
 namespace geometry {
@@ -733,6 +735,15 @@ class Meshcat {
   Note that controls (e.g. sliders and buttons) are not included in the HTML
   output, because their usefulness relies on a connection to the server. */
   std::string StaticHtml();
+
+  /** Returns an image screenshot from the sole connected meshcat window.
+  `x_resolution` and `y_resolution` are in pixels; `timeout` is in seconds. If
+  GetNumActiveConnections() != 1 or if the image parsing fails, then an empty
+  image will be returned.
+  */
+  systems::sensors::ImageRgba8U CaptureImage(int x_resolution = 1920,
+                                             int y_resolution = 1080,
+                                             double timeout = 1.0);
 
   /** Sets a flag indicating that subsequent calls to SetTransform and
   SetProperty should also be "recorded" into a MeshcatAnimation when their

@@ -29,6 +29,7 @@ void DoScalarDependentDefinitions(py::module m, T) {
   using namespace drake::geometry;
   py::module::import("pydrake.systems.framework");
   py::module::import("pydrake.systems.lcm");
+  py::module::import("pydrake.systems.sensors");
 
   // DrakeVisualizer
   {
@@ -328,6 +329,9 @@ void DoScalarIndependentDefinitions(py::module m) {
             cls_doc.DeleteAddedControls.doc)
         .def("GetGamepad", &Class::GetGamepad, cls_doc.GetGamepad.doc)
         .def("StaticHtml", &Class::StaticHtml, cls_doc.StaticHtml.doc)
+        .def("CaptureImage", &Class::CaptureImage, 
+            py::arg("x_resolution") = 1920, py::arg("y_resolution") = 1080,
+            py::arg("timeout") = 1.0, cls_doc.CaptureImage.doc)
         .def("StartRecording", &Class::StartRecording,
             py::arg("frames_per_second") = 32.0,
             py::arg("set_visualizations_while_recording") = true,

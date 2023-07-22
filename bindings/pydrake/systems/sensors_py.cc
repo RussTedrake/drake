@@ -64,11 +64,13 @@ PYBIND11_MODULE(sensors, m) {
 
   // Expose only types that are used.
   py::enum_<PixelFormat>(m, "PixelFormat")
+      .value("kRgb", PixelFormat::kRgb)
       .value("kRgba", PixelFormat::kRgba)
       .value("kDepth", PixelFormat::kDepth)
       .value("kLabel", PixelFormat::kLabel);
 
   vector<string> pixel_type_names = {
+      "kRgb8U",
       "kRgba8U",
       "kDepth16U",
       "kDepth32F",
@@ -77,6 +79,7 @@ PYBIND11_MODULE(sensors, m) {
 
   // This list should match pixel_type_names.
   using PixelTypeList = constant_pack<PixelType,  //
+      PixelType::kRgb8U,                          //
       PixelType::kRgba8U,                         //
       PixelType::kDepth16U,                       //
       PixelType::kDepth32F,                       //
@@ -144,9 +147,13 @@ PYBIND11_MODULE(sensors, m) {
       image  // BR
           .def(py::init<>(), doc.Image.ctor.doc_0args)
           .def(py::init<int, int>(), py::arg("width"), py::arg("height"),
-              doc.Image.ctor.doc_2args)
+              doc.Image.ctor.doc_2args_width_height)
           .def(py::init<int, int, T>(), py::arg("width"), py::arg("height"),
-              py::arg("initial_value"), doc.Image.ctor.doc_3args)
+              py::arg("initial_value"),
+              doc.Image.ctor.doc_3args_width_height_initial_value)
+          .def(py::init<int, int, std::vector<T>>(), py::arg("width"),
+              py::arg("height"), py::arg("data"),
+              doc.Image.ctor.doc_3args_width_height_data)
           .def("width", &ImageT::width, doc.Image.width.doc)
           .def("height", &ImageT::height, doc.Image.height.doc)
           .def("size", &ImageT::size, doc.Image.size.doc)

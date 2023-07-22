@@ -23,6 +23,7 @@
 #include <drake_vendor/msgpack.hpp>
 #include <drake_vendor/uuid.h>
 #include <fmt/format.h>
+#include <png.h>
 
 #include "drake/common/drake_export.h"
 #include "drake/common/drake_throw.h"
@@ -105,6 +106,7 @@ namespace {
 
 using math::RigidTransformd;
 using math::RotationMatrixd;
+using systems::sensors::ImageRgba8U;
 
 constexpr static bool kSsl = false;
 constexpr static bool kIsServer = true;
@@ -1559,6 +1561,66 @@ class Meshcat::Impl {
     return html;
   }
 
+  ImageRgba8U CaptureImage(int x_resolution, int y_resolution, double timeout) {
+    ImageRgba8U image_rgba;
+    if (GetNumActiveConnections() != 1) {
+      log()->error(
+          "Meshcat::CaptureImage failed. You have {} active connections, but "
+          "CaptureImage requires that you have exactly one active connection.",
+          GetNumActiveConnections());
+      return image_rgba;
+    }
+    internal::CaptureImage data;
+    data.xres = x_resolution;
+    data.yres = y_resolution;
+
+    Defer([this, data = std::move(data)]() {
+      DRAKE_DEMAND(IsThread(websocket_thread_id_));
+      DRAKE_DEMAND(app_ != nullptr);
+      std::stringstream message_stream;
+      msgpack::pack(message_stream, data);
+      app_->publish("all", message_stream.str(), uWS::OpCode::BINARY, false);
+    });
+
+    // Grab the current time, to implement the timeout.
+    using Clock = std::chrono::steady_clock;
+    using Duration = std::chrono::duration<double>;
+    const auto start_time = Clock::now();
+
+    while (Duration(Clock::now() - start_time).count() < timeout) {
+      std::lock_guard<std::mutex> lock(controls_mutex_);
+      if (image_data_.empty()) {
+        continue;
+      }
+      // Convert png byte array into ImageRgba8U.
+      png_image image;
+      memset(&image, 0, sizeof(image));
+      image.version = PNG_IMAGE_VERSION;
+
+      if (png_image_begin_read_from_memory(&image, image_data_.data(),
+                                           image_data_.size())) {
+        std::vector<uint8_t> raw_pixel_data(PNG_IMAGE_SIZE(image));
+        if (raw_pixel_data.size() != 0 &&
+            png_image_finish_read(&image, nullptr, raw_pixel_data.data(), 0,
+                                  nullptr)) {
+          image_rgba = ImageRgba8U(x_resolution, y_resolution,
+                                   std::move(raw_pixel_data));
+        } else {
+          log()->error(
+              "Meshcat::CaptureImage: png_image_finish_read() failed.");
+        }
+      } else {
+        log()->error(
+            "Meshcat::CaptureImage: png_image_begin_read_from_memory() "
+            "failed.");
+      }
+      png_image_free(&image);
+      image_data_.clear();
+      break;
+    }
+    return image_rgba;
+  }
+
   // This function is public via the PIMPL.
   bool HasPath(std::string_view path) const {
     DRAKE_DEMAND(IsThread(main_thread_id_));
@@ -1861,10 +1923,21 @@ class Meshcat::Impl {
           msgpack::unpack(message.data(), message.size());
       o_h.get().convert(data);
     } catch (const msgpack::type_error& e) {
+      // TODO(russt): Meshcat handles "capture_image" by sending back a string
+      // in JSON, instead of using msgpack. Consider upstreaming the fix so
+      // that the protocols are consistent.
+      size_t pos = message.find("data:image/png;base64,") + 22;
+      if (pos != std::string_view::npos) {
+        int end_pos = message.find('"', pos);
+        std::lock_guard<std::mutex> lock(controls_mutex_);
+        image_data_ = common_robotics_utilities::base64_helpers::Decode(
+            std::string(message.substr(pos, end_pos - pos)));
+        return;
+      }
       // Quietly ignore messages that don't match our expected message type.
       // This violates the style guide, but msgpack does not provide any other
       // mechanism for checking the message type.
-      drake::log()->debug("Meshcat ignored an unparsable message");
+      drake::log()->debug("Meshcat ignored an unparsable message {}", message);
       return;
     }
     std::lock_guard<std::mutex> lock(controls_mutex_);
@@ -1971,6 +2044,7 @@ class Meshcat::Impl {
   std::map<std::string, internal::SetButtonControl, std::less<>> buttons_{};
   std::map<std::string, internal::SetSliderControl, std::less<>> sliders_{};
   Meshcat::Gamepad gamepad_{};
+  std::vector<uint8_t> image_data_{};  // used by CaptureImage().
   std::vector<std::string> controls_{};  // Names of buttons and sliders in the
                                          // order they were added.
 
@@ -2374,6 +2448,11 @@ std::string Meshcat::StaticHtml() {
   return impl().StaticHtml();
 }
 
+ImageRgba8U Meshcat::CaptureImage(int x_resolution, int y_resolution,
+                                  double timeout) {
+  return impl().CaptureImage(x_resolution, y_resolution, timeout);
+}
+
 void Meshcat::StartRecording(double frames_per_second,
                              bool set_visualizations_while_recording) {
   animation_ = std::make_unique<MeshcatAnimation>(frames_per_second);
@@ -2423,5 +2502,5 @@ void Meshcat::InjectWebsocketThreadFault(int fault_number) {
   impl().InjectWebsocketThreadFault(fault_number);
 }
 
-}  // namespace geometry
+  }  // namespace geometry
 }  // namespace drake

@@ -101,6 +101,17 @@ class Image {
     DRAKE_THROW_UNLESS((width == 0) == (height == 0));
   }
 
+  /// Image size and initial value constructor.  Specifies a width, height and
+  /// the initial image data. The width and height can be either both zero or
+  /// both strictly positive.
+  Image(int width, int height, std::vector<T> data)
+      : width_(width), height_(height), data_(std::move(data)) {
+    DRAKE_THROW_UNLESS((width >= 0) && (height >= 0));
+    DRAKE_THROW_UNLESS((width == 0) == (height == 0));
+    DRAKE_THROW_UNLESS(static_cast<int>(data_.size()) ==
+                       width * height * kNumChannels);
+  }
+
   /// Returns the size of width for the image
   int width() const { return width_; }
 
