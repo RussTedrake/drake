@@ -117,15 +117,26 @@ GTEST_TEST(LcmSubscriberSystemTest, InitializationNoWaitTest) {
 
   // Produce a sample message.
   SampleData sample_data;
-  sample_data.PublishAndHandle(&lcm, channel_name);
+  // Publish, but do not call handle.
+  Publish(&lcm, channel_name, sample_data.value);
 
-  // Use the initialization event to process the message.
+  // Fire the initialization event. It should NOT process the message.
   dut->ExecuteInitializationEvents(context.get());
   dut->CalcOutput(*context, output.get());
-
   const AbstractValue* abstract_value = output->get_data(0);
   ASSERT_NE(abstract_value, nullptr);
   auto value = abstract_value->get_value<lcmt_drake_signal>();
+  EXPECT_TRUE(CompareLcmtDrakeSignalMessages(value, lcmt_drake_signal{}));
+
+  // Receive the message.
+  lcm.HandleSubscriptions(0);
+
+  // Now the initialization event should process the message.
+  dut->ExecuteInitializationEvents(context.get());
+  dut->CalcOutput(*context, output.get());
+  abstract_value = output->get_data(0);
+  ASSERT_NE(abstract_value, nullptr);
+  value = abstract_value->get_value<lcmt_drake_signal>();
   EXPECT_TRUE(CompareLcmtDrakeSignalMessages(value, sample_data.value));
 }
 
@@ -155,10 +166,26 @@ GTEST_TEST(LcmSubscriberSystemTest, InitializationWithWaitTest) {
   // Now the initialization event calls handle and obtains the message.
   dut->ExecuteInitializationEvents(context.get());
   dut->CalcOutput(*context, output.get());
-
   const AbstractValue* abstract_value = output->get_data(0);
   ASSERT_NE(abstract_value, nullptr);
   auto value = abstract_value->get_value<lcmt_drake_signal>();
+  EXPECT_TRUE(CompareLcmtDrakeSignalMessages(value, sample_data.value));
+
+  // A second initialization event will fail (timeout) with no *new* message.
+  DRAKE_EXPECT_THROWS_MESSAGE(dut->ExecuteInitializationEvents(context.get()),
+                              "Timed out without receiving any message on "
+                              "channel channel_name at url.*");
+
+  // Publish, but do not call handle, with a new message.
+  sample_data.value.timestamp += 1;
+  Publish(&lcm, channel_name, sample_data.value);
+
+  // Now the initialization event calls handle and obtains the message.
+  dut->ExecuteInitializationEvents(context.get());
+  dut->CalcOutput(*context, output.get());
+  abstract_value = output->get_data(0);
+  ASSERT_NE(abstract_value, nullptr);
+  value = abstract_value->get_value<lcmt_drake_signal>();
   EXPECT_TRUE(CompareLcmtDrakeSignalMessages(value, sample_data.value));
 }
 

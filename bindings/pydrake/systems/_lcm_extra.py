@@ -53,13 +53,15 @@ def _make_lcm_subscriber(channel,
         lcm: LCM service instance.
         use_cpp_serializer: Use C++ serializer to interface with LCM converter
             systems that are implemented in C++. LCM types must be registered
-            in C++ via `BindCppSerializer`.
-        wait_for_message_on_initialization_timeout: The number of seconds
-            (wall-clock elapsed time) to wait for GetInternalMessageCount() to
-            be > 0. If this timeout is <= 0, then the initialization event does
-            not handle any new messages, but only processes existing received
-            messages. If the timeout is > 0, then the initialization event will
-            call lcm.HandleSubscriptions() until at least one message is
+            in C++ via ``BindCppSerializer``.
+        wait_for_message_on_initialization_timeout: Configures the behavior of
+            initialization events (see ``System.ExecuteInitializationEvents``
+            and ``Simulator.Initialize``) by specifying the number of seconds
+            (wall-clock elapsed time) to wait for a new message. If this
+            timeout is <= 0, initialization will copy any already-received
+            messages into the Context but will not process any new messages.
+            If this timeout is > 0, initialization will call
+            ``lcm.HandleSubscriptions()`` until at least one message is
             received or until the timeout. Pass ∞ to wait indefinitely.
     """
     # TODO(eric.cousineau): Make `use_cpp_serializer` be kwarg-only.

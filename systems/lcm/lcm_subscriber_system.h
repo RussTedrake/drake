@@ -61,13 +61,14 @@ class LcmSubscriberSystem : public LeafSystem<double> {
    * `wait_for_message_on_initialization_timeout > 0`, then the pointer must
    * remain valid for the lifetime of the returned system.
    *
-   * @param wait_for_message_on_initialization_timeout The number of seconds
-   * (wall-clock elapsed time) to wait for GetInternalMessageCount() to be > 0.
-   * If this timeout is <= 0, then the initialization event does not handle any
-   * new messages, but only processes existing received messages. If the
-   * timeout is > 0, then the initialization event will call
-   * lcm->HandleSubscriptions() until at least one message is received or until
-   * the timeout. Pass ∞ to wait indefinitely.
+   * @param wait_for_message_on_initialization_timeout Configures the behavior
+   * of initialization events (see System::ExecuteInitializationEvents() and
+   * Simulator::Initialize()) by specifying the number of seconds (wall-clock
+   * elapsed time) to wait for a new message. If this timeout is <= 0,
+   * initialization will copy any already-received messages into the Context but
+   * will not process any new messages. If this timeout is > 0, initialization
+   * will call lcm->HandleSubscriptions() until at least one message is received
+   * or until the timeout. Pass ∞ to wait indefinitely.
    */
   template <typename LcmMessage>
   static std::unique_ptr<LcmSubscriberSystem> Make(
@@ -92,13 +93,14 @@ class LcmSubscriberSystem : public LeafSystem<double> {
    * `wait_for_message_on_initialization_timeout > 0`, then the pointer must
    * remain valid for the lifetime of the returned system.
    *
-   * @param wait_for_message_on_initialization_timeout The number of seconds
-   * (wall-clock elapsed time) to wait for GetInternalMessageCount() to be > 0.
-   * If this timeout is <= 0, then the initialization event does not handle any
-   * new messages, but only processes existing received messages. If the
-   * timeout is > 0, then the initialization event will call
-   * lcm->HandleSubscriptions() until at least one message is received or until
-   * the timeout. Pass ∞ to wait indefinitely.
+   * @param wait_for_message_on_initialization_timeout Configures the behavior
+   * of initialization events (see System::ExecuteInitializationEvents() and
+   * Simulator::Initialize()) by specifying the number of seconds (wall-clock
+   * elapsed time) to wait for a new message. If this timeout is <= 0,
+   * initialization will copy any already-received messages into the Context but
+   * will not process any new messages. If this timeout is > 0, initialization
+   * will call lcm->HandleSubscriptions() until at least one message is received
+   * or until the timeout. Pass ∞ to wait indefinitely.
    */
   LcmSubscriberSystem(const std::string& channel,
                       std::shared_ptr<const SerializerInterface> serializer,
@@ -149,11 +151,10 @@ class LcmSubscriberSystem : public LeafSystem<double> {
                             systems::CompositeEventCollection<double>* events,
                             double* time) const final;
 
-  systems::EventStatus ProcessMessageAndStoreToAbstractState(
-      const Context<double>&, State<double>* state) const;
+  EventStatus ProcessMessageAndStoreToAbstractState(const Context<double>&,
+                                                    State<double>* state) const;
 
-  systems::EventStatus Initialize(const Context<double>&,
-                                  State<double>* state) const;
+  EventStatus Initialize(const Context<double>&, State<double>* state) const;
 
   // The channel on which to receive LCM messages.
   const std::string channel_;
