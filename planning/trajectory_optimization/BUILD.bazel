@@ -102,6 +102,19 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "fast_path_planner",
+    srcs = ["fast_path_planner.cc"],
+    hdrs = ["fast_path_planner.h"],
+    deps = [
+        "//common",
+        "//common/trajectories:bezier_curve",
+        "//common/trajectories:composite_trajectory",
+        "//geometry/optimization:convex_set",
+        "//solvers:solve",
+    ],
+)
+
+drake_cc_library(
     name = "gcs_trajectory_optimization",
     srcs = ["gcs_trajectory_optimization.cc"],
     hdrs = ["gcs_trajectory_optimization.h"],
@@ -163,6 +176,16 @@ drake_cc_googletest(
         "//solvers:solve",
         "//systems/primitives:symbolic_vector_system",
         "//systems/primitives:trajectory_linear_system",
+    ],
+)
+
+drake_cc_googletest(
+    name = "fast_path_planner_test",
+    deps = [
+        ":fast_path_planner",
+        "//common/test_utilities:eigen_matrix_compare",
+        "//common/test_utilities:expect_no_throw",
+        "//common/test_utilities:expect_throws_message",
     ],
 )
 
