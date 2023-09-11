@@ -1056,9 +1056,9 @@ bool Polynomial::IsOdd() const {
 
 Eigen::VectorXcd Polynomial::Roots() const {
   if (indeterminates().size() != 1) {
-    throw std::runtime_error(fmt::format(
-        "{} is not a univariate polynomial; it has indeterminates {}.",
-        ToExpression().to_string(), indeterminates().to_string()));
+    throw runtime_error(fmt::format(
+        "{} is not a univariate polynomial; it has indeterminates {}.", *this,
+        indeterminates()));
   }
 
   // We find the roots by computing the eigenvalues of the companion matrix.
@@ -1074,11 +1074,11 @@ Eigen::VectorXcd Polynomial::Roots() const {
   double leading_coefficient = 0;
   for (const auto& [monomial, coeff] : monomial_to_coefficient_map()) {
     if (!is_constant(coeff)) {
-      throw std::runtime_error(
-          fmt::format("Polynomial::Roots() only supports polynomials with "
-                      "constant coefficients. This polynomial has coefficient "
-                      "{} for the monomial {}.",
-                      coeff.to_string(), monomial.ToExpression().to_string()));
+      throw runtime_error(fmt::format(
+          "Polynomial::Roots() only supports polynomials with constant "
+          "coefficients. This polynomial has coefficient {} for the "
+          "monomial {}.",
+          coeff, monomial));
     }
     const int power = monomial.total_degree();
     if (power == degree) {

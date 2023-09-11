@@ -1512,7 +1512,7 @@ TEST_F(SymbolicPolynomialTest, Roots) {
 
   // Note: the order of the roots is not guaranteed. Sort them here by real,
   // then imaginary.
-  auto sort = [](const Eigen::VectorXcd& v) {
+  auto sorted = [](const Eigen::VectorXcd& v) {
     Eigen::VectorXcd v_sorted = v;
     std::sort(v_sorted.data(), v_sorted.data() + v_sorted.size(),
               [](const std::complex<double>& a, const std::complex<double>& b) {
@@ -1526,14 +1526,14 @@ TEST_F(SymbolicPolynomialTest, Roots) {
 
   // Include a repeated root.
   p = symbolic::Polynomial{(x_ - 1.23) * (x_ - 4.56) * (x_ - 4.56)};
-  roots = sort(p.Roots());
+  roots = sorted(p.Roots());
   EXPECT_TRUE(
       CompareMatrices(roots.real(), Eigen::Vector3d{1.23, 4.56, 4.56}, 1e-7));
   EXPECT_TRUE(CompareMatrices(roots.imag(), Eigen::Vector3d::Zero(), 1e-7));
 
   // Complex roots.  x^4 - 1 has roots {-1, -i, i, 1}.
   p = symbolic::Polynomial{pow(x_, 4) - 1};
-  roots = sort(p.Roots());
+  roots = sorted(p.Roots());
   EXPECT_TRUE(
       CompareMatrices(roots.real(), Eigen::Vector4d{-1, 0, 0, 1}, 1e-7));
   EXPECT_TRUE(
@@ -1541,7 +1541,7 @@ TEST_F(SymbolicPolynomialTest, Roots) {
 
   // Leading coefficient is not 1.
   p = symbolic::Polynomial{(2.1 * x_ - 1.23) * (x_ - 4.56)};
-  roots = sort(p.Roots());
+  roots = sorted(p.Roots());
   EXPECT_TRUE(
       CompareMatrices(roots.real(), Eigen::Vector2d{1.23 / 2.1, 4.56}, 1e-7));
   EXPECT_TRUE(CompareMatrices(roots.imag(), Eigen::Vector2d::Zero(), 1e-7));
