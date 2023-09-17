@@ -34,6 +34,7 @@ extent possible.
 */
 class FastPathPlanner final {
  public:
+  using VertexId = Identifier<class VertexTag>;
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(FastPathPlanner);
 
   /** Constructs the motion planning problem.
@@ -60,13 +61,7 @@ class FastPathPlanner final {
     int order() const { return order_; }
 
     /** Returns the number of vertices in the subgraph. */
-    int size() const { return regions_.size(); }
-
-    /** Returns the regions associated with this subgraph before the
-    CartesianProduct. */
-    const geometry::optimization::ConvexSets& regions() const {
-      return regions_;
-    }
+    int size() const { return vertex_ids_.size(); }
 
     // TODO(russt): Implement additional supported costs and constraints from GcsTrajectoryOptimization and the FPP paper.
 
@@ -80,16 +75,18 @@ class FastPathPlanner final {
     */
     void AddPathLengthCost(double weight = 1.0);
 
-   private:
+  private:
     /* Constructs a new subgraph and copies the regions. */
-    Subgraph(const geometry::optimization::ConvexSets& regions,
-             const std::vector<std::pair<int, int>>& regions_to_connect,
-             int order, double h_min, double h_max, std::string name,
-             FastPathPlanner* traj_opt);
+    Subgraph(const std::vector<FastPathPlanner::VertexId> vertex_ids,
+             int order, double h_min, double h_max, std::string name);
     
-    std::string name_;
+    std::vector<FastPathPlanner::VertexId> vertex_ids_{};
     int order_;
-    geometry::optimization::ConvexSets regions_;
+    double h_min_;
+    double h_max_;
+    std::string name_{};
+
+    friend class FastPathPlanner;
   };
 
   /** EdgesBetweenSubgraphs are defined as the connecting edges between two
@@ -217,8 +214,14 @@ class FastPathPlanner final {
   const int num_positions_;
   bool needs_preprocessing_{true};
 
-  std::vector<std::unique_ptr<Subgraph>> subgraphs_;
-  std::vector<std::unique_ptr<EdgesBetweenSubgraphs>> subgraph_edges_;
+  std::map<VertexId, copyable_unique_ptr<geometry::optimization::ConvexSet>>
+      vertices_{};
+  std::vector<std::pair<VertexId, VertexId>> edges_{};
+  std::map<VertexId, Eigen::VectorXd> points_{};
+  std::vector<double> edge_weights_{};
+
+  std::vector<std::unique_ptr<Subgraph>> subgraphs_{};
+  std::vector<std::unique_ptr<EdgesBetweenSubgraphs>> subgraph_edges_{};
 };
 
 }  // namespace trajectory_optimization
