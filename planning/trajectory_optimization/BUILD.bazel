@@ -111,6 +111,7 @@ drake_cc_library(
         "//common/trajectories:composite_trajectory",
         "//geometry/optimization:convex_set",
         "//solvers:solve",
+        "//solvers:get_program_type",
     ],
 )
 

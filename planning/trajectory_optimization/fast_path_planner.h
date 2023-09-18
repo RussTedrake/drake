@@ -207,8 +207,8 @@ class FastPathPlanner final {
   */
   trajectories::CompositeTrajectory<double>
   SolvePath(
-      const Eigen::Ref<const Eigen::VectorXd>& p_start,
-      const Eigen::Ref<const Eigen::VectorXd>& p_goal);
+      const Eigen::Ref<const Eigen::VectorXd>& q_start,
+      const Eigen::Ref<const Eigen::VectorXd>& q_goal);
 
  private:
   const int num_positions_;
@@ -216,9 +216,21 @@ class FastPathPlanner final {
 
   std::map<VertexId, copyable_unique_ptr<geometry::optimization::ConvexSet>>
       vertices_{};
-  std::vector<std::pair<VertexId, VertexId>> edges_{};
-  std::map<VertexId, Eigen::VectorXd> points_{};
-  std::vector<double> edge_weights_{};
+
+  struct Edge {
+    VertexId u;
+    VertexId v;
+  };
+  struct LineGraphEdge {
+    int u;  // index into edges_.
+    int v;  // index into edges_.
+    double weight;
+  };
+
+  std::vector<Edge> edges_{};
+  std::map<VertexId, std::vector<int>> edge_ids_by_vertex_;
+  std::vector<LineGraphEdge> line_graph_edges_{};
+  Eigen::MatrixXd points_{};  // num_positions x num_edges.
 
   std::vector<std::unique_ptr<Subgraph>> subgraphs_{};
   std::vector<std::unique_ptr<EdgesBetweenSubgraphs>> subgraph_edges_{};

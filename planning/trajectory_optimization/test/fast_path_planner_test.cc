@@ -28,10 +28,7 @@ GTEST_TEST(FastPathPlannerTest, Small2D) {
   // clang-format on
 
   FastPathPlanner fpp(2);
-  const int order =
-      8;  // TODO(russt): Confirm that this is the order that actually results
-          // from the python example (it's using defaults that looks to be (size
-          // of alpha + 1)*2, but let's see).
+  const int order = 7;
   fpp.AddRegions(regions, order);
   fpp.Preprocess();
 }
