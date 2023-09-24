@@ -1,5 +1,6 @@
 #include "drake/planning/trajectory_optimization/fast_path_planner.h"
 
+#include <common_robotics_utilities/simple_astar_search.hpp>
 
 #include "drake/solvers/solve.h"
 #include "drake/solvers/get_program_type.h"
@@ -7,6 +8,17 @@
 namespace drake {
 namespace planning {
 namespace trajectory_optimization {
+
+namespace {
+  using common_robotics_utilities::simple_astar_search::StateWithCost;
+
+  template <typename T>
+  class MyStateWithCost : public StateWithCost<T> {
+   public:
+    MyStateWithCost(const T& state, double cost)
+        : StateWithCost<T>(state, cost) {}
+  };
+}  // namespace
 
 using geometry::optimization::ConvexSet;
 using geometry::optimization::ConvexSets;
@@ -19,6 +31,12 @@ using Subgraph = FastPathPlanner::Subgraph;
 using VertexId = FastPathPlanner::VertexId;
 
 const double kInf = std::numeric_limits<double>::infinity();
+
+struct FastPathPlanner::LineGraph {
+public:
+  std::vector<std::vector<MyStateWithCost<int>>> edges;
+};
+
 
 FastPathPlanner::FastPathPlanner(int num_positions)
     : num_positions_{num_positions} {}
@@ -81,18 +99,12 @@ Subgraph& FastPathPlanner::AddRegions(
 
 void FastPathPlanner::Preprocess() {
   const int num_edges = edges_.size();
-  // Compute line graph.
+
+  // Build line graph data.
   edge_ids_by_vertex_.clear();
   for (int i=0; i<num_edges; ++i) {
     edge_ids_by_vertex_[edges_[i].u].emplace_back(i);
     edge_ids_by_vertex_[edges_[i].v].emplace_back(i);
-  }
-  for (const auto& [vertex_id, edge_ids] : edge_ids_by_vertex_) {
-    for (int i = 0; i < ssize(edge_ids); ++i) {
-      for (int j = i + 1; j < ssize(edge_ids); ++j) {
-        line_graph_edges_.emplace_back(LineGraphEdge{i, j, kInf});
-      }
-    }
   }
 
   // Optimize points.
@@ -109,18 +121,33 @@ void FastPathPlanner::Preprocess() {
       -MatrixXd::Identity(num_positions_, num_positions_);
   const VectorXd b = VectorXd::Zero(num_positions_);
   VectorXDecisionVariable vars(2 * num_positions_);
-  for (const auto& e : line_graph_edges_) {
-    vars.head(num_positions_) = x.col(e.u);
-    vars.tail(num_positions_) = x.col(e.v);
-    prog.AddL2NormCostUsingConicConstraint(A, b, vars);
+  for (const auto& [vertex_id, edge_ids] : edge_ids_by_vertex_) {
+    for (int i = 0; i < ssize(edge_ids); ++i) {
+      for (int j = i + 1; j < ssize(edge_ids); ++j) {
+        vars.head(num_positions_) = x.col(i);
+        vars.tail(num_positions_) = x.col(j);
+        prog.AddL2NormCostUsingConicConstraint(A, b, vars);
+      }
+    }
   }
   auto result = Solve(prog);
   DRAKE_DEMAND(result.is_success());
   points_ = result.GetSolution(x);
 
-  // Assign weights.
-  for (auto& e : line_graph_edges_) {
-    e.weight = (points_.col(e.u) - points_.col(e.v)).norm();
+  // Store line graph with edge weights.
+  line_graph_ = std::make_unique<LineGraph>();
+  line_graph_->edges.resize(num_edges);
+  for (const auto& [vertex_id, edge_ids] : edge_ids_by_vertex_) {
+    for (int i = 0; i < ssize(edge_ids); ++i) {
+      for (int j = i + 1; j < ssize(edge_ids); ++j) {
+        double cost =
+            (points_.col(edge_ids[i]) - points_.col(edge_ids[j])).norm();
+        line_graph_->edges[edge_ids[i]].emplace_back(
+            MyStateWithCost(edge_ids[j], cost));
+        line_graph_->edges[edge_ids[j]].emplace_back(
+            MyStateWithCost(edge_ids[i], cost));
+      }
+    }
   }
 
   needs_preprocessing_ = false;  
@@ -129,21 +156,46 @@ void FastPathPlanner::Preprocess() {
 trajectories::CompositeTrajectory<double> FastPathPlanner::SolvePath(
     const Eigen::Ref<const Eigen::VectorXd>& q_start,
     const Eigen::Ref<const Eigen::VectorXd>& q_goal) {
+  // TODO(russt): Support restricting the start and goal to subgraphs.
+
   // Stabbing problem.
   // TODO(russt): we could parallelize this.
-  std::vector<VertexId> start_vertices;
-  std::vector<VertexId> goal_vertices;
+  StatesWithCosts start_states;
+  const int GOAL_ID = -1;
   for (const auto& [vertex_id, region] : vertices_) {
-    if (region.PointInSet(q_start)) {
-      start_vertices.push_back(vertex_id);
+    if (region->PointInSet(q_start)) {
+      for (const auto& edge_id : edge_ids_by_vertex_.at(vertex_id)) {
+        start_states.emplace_back(
+            StateWithCost(vertex_id, (q_start - points.col(edge_id)).norm()));
+        };
     }
-    if (region.PointInSet(q_goal)) {
-      goal_vertices.push_back(vertex_id);
+    if (region->PointInSet(q_goal)) {
+      for (const auto& edge_id : edge_ids_by_vertex_.at(vertex_id)) {
+        cost = (q_goal - points.col(edge_id)).norm();
+        line_graph_->edges[edge_id].emplace_back(
+            MyStateWithCost(GOAL_ID, cost));
     }
   }
 
-  // Plan with A*.
+  auto goal_check_fn = [](const int& edge_id) {
+    return edge_id == GOAL_ID;
+  };
 
+  auto generate_valid_children_fn(const int& edge_id) {
+    return line_graph_->edges[edge_id];
+  };
+
+  auto heuristic_fn = [](const int& edge_id) {
+    return (points[edge_id] - q_goal).norma();
+  };
+
+  // Plan with A*.
+  auto result =
+      common_robotics_utilities::simple_astar_search::PerformAstarSearch(
+          start_states, goal_checK_fn, generate_valid_children_fn,
+          heuristic_fn);
+
+  return trajectories::CompositeTrajectory<double>({});
 }
 
 }  // namespace trajectory_optimization
