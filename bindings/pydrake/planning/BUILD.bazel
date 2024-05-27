@@ -29,6 +29,7 @@ drake_pybind_library(
         "//bindings/pydrake/common:default_scalars_pybind",
         "//bindings/pydrake/common:wrap_pybind",
         "//bindings/pydrake/geometry:optimization_pybind",
+        "@common_robotics_utilities",
     ],
     cc_so_name = "__init__",
     cc_srcs = [
@@ -42,6 +43,8 @@ drake_pybind_library(
         "planning_py_visibility_graph.cc",
         "planning_py_iris_from_clique_cover.cc",
         "planning_py_zmp_planner.cc",
+        "planning_py_sampling_based_planners.cc",
+        "planning_py_common_robotics_utilities.cc",
     ],
     package_info = PACKAGE_INFO,
     py_deps = [

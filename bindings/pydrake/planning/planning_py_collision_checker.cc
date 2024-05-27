@@ -4,8 +4,13 @@
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/planning/collision_checker.h"
 #include "drake/planning/distance_and_interpolation_provider.h"
+#include "drake/planning/make_planning_robot.h"
+#include "drake/planning/mbp_environment_collision_checker.h"
 #include "drake/planning/scene_graph_collision_checker.h"
+#include "drake/planning/sphere_robot_model_collision_checker.h"
 #include "drake/planning/unimplemented_collision_checker.h"
+#include "drake/planning/voxelized_environment_builder.h"
+#include "drake/planning/voxelized_environment_collision_checker.h"
 
 namespace drake {
 namespace pydrake {
@@ -19,6 +24,11 @@ void DefinePlanningCollisionChecker(py::module m) {
   // NOLINTNEXTLINE(build/namespaces): Emulate placement in namespace.
   using namespace drake::planning;
   constexpr auto& doc = pydrake_doc.drake.planning;
+
+  m.def("MakeWeightedConfigurationDistanceFunction",
+      &MakeWeightedConfigurationDistanceFunction, py::arg("plant"),
+      py::arg("robot_model_instances"), py::arg("named_joint_distance_weights"),
+      py::arg("default_joint_distance_weight") = 1.0, "");
 
   {
     using Class = CollisionChecker;
@@ -280,35 +290,219 @@ void DefinePlanningCollisionChecker(py::module m) {
   }
 
   {
-    using Class = SceneGraphCollisionChecker;
-    constexpr auto& cls_doc = doc.SceneGraphCollisionChecker;
+    using Class = VoxelizedEnvironmentCollisionChecker;
     py::class_<Class, CollisionChecker> cls(
-        m, "SceneGraphCollisionChecker", cls_doc.doc);
-    // TODO(jwnimmer-tri) Bind the __init__(params=...) constructor here once
-    // we've solved the unique_ptr vs shared_ptr binding lifetime issue.
-    py::object params_ctor = m.attr("CollisionCheckerParams");
+        m, "VoxelizedEnvironmentCollisionChecker", "");
     cls  // BR
-        .def(py::init([params_ctor](std::unique_ptr<RobotDiagram<double>> model,
-                          const py::kwargs& kwargs) {
-          // For lifetime management, we need to treat pointer-like arguments
-          // separately. Start by creating a Params object in Python with all
-          // of the other non-pointer kwargs.
-          py::object params_py = params_ctor(**kwargs);
-          auto* params = params_py.cast<CollisionCheckerParams*>();
-          DRAKE_DEMAND(params != nullptr);
-          // Now, transfer ownership of the pointer.
-          params->model = std::move(model);
-          return std::make_unique<SceneGraphCollisionChecker>(
-              std::move(*params));
+        .def(py::init([](std::unique_ptr<RobotDiagram<double>> model,
+                          std::vector<drake::multibody::ModelInstanceIndex>
+                              robot_model_instances,
+                          double edge_step_size, double env_collision_padding,
+                          double self_collision_padding,
+                          const std::map<std::string, double>&
+                              named_joint_distance_weights,
+                          double default_joint_distance_weight) {
+          auto distance_fn = MakeWeightedConfigurationDistanceFunction(
+              model->plant(), robot_model_instances,
+              named_joint_distance_weights, default_joint_distance_weight);
+          auto params = CollisionCheckerParams{std::move(model),
+              robot_model_instances, distance_fn, edge_step_size,
+              env_collision_padding, self_collision_padding};
+          return std::make_unique<Class>(std::move(params));
         }),
-            py::kw_only(), py::arg("model"),
-            // Keep alive, ownership: `model` keeps `self` alive.
-            py::keep_alive<2, 1>(),
-            (std::string(cls_doc.ctor.doc) +
-                "\n\n"
-                "See :class:`pydrake.planning.CollisionCheckerParams` for the "
-                "list of properties available here as kwargs.")
-                .c_str());
+            py::arg("model"), py::arg("robot_model_instances"),
+            py::arg("edge_step_size"), py::arg("env_collision_padding"),
+            py::arg("self_collision_padding"),
+            py::arg("named_joint_distance_weights"),
+            py::arg("default_joint_distance_weight"), "")
+        .def(
+            "VoxelizeEnvironment",
+            [](Class* self, const Eigen::Vector3d& grid_size,
+                const double grid_resolution) {
+              std::unordered_set<drake::geometry::GeometryId> robot_geometries;
+              for (const auto& model_index : self->robot_model_instances()) {
+                const std::vector<BodyIndex> bodies =
+                    self->plant().GetBodyIndices(model_index);
+                for (const BodyIndex& body_index : bodies) {
+                  const Body<double>& body = self->plant().get_body(body_index);
+                  const std::vector<drake::geometry::GeometryId>& geoms =
+                      self->plant().GetCollisionGeometriesForBody(body);
+                  for (const drake::geometry::GeometryId geom_id : geoms) {
+                    robot_geometries.insert(geom_id);
+                  }
+                }
+              }
+
+              auto transform = Eigen::Isometry3d::Identity();
+              transform.translation() = -grid_size / 2;
+              const auto environment = BuildCollisionMap(self->plant(),
+                  self->plant_context(), robot_geometries, "world", transform,
+                  grid_size, grid_resolution);
+              self->UpdateEnvironment("world", environment);
+            },
+            py::arg("grid_size"), py::arg("grid_resolution"), "");
+  }
+
+  {
+    using Class = VoxelizedEnvironmentCollisionChecker;
+    py::class_<Class, CollisionChecker> cls(
+        m, "VoxelizedEnvironmentCollisionChecker", "");
+    cls  // BR
+        .def(py::init([](std::unique_ptr<RobotDiagram<double>> model,
+                          std::vector<drake::multibody::ModelInstanceIndex>
+                              robot_model_instances,
+                          double edge_step_size, double env_collision_padding,
+                          double self_collision_padding,
+                          const std::map<std::string, double>&
+                              named_joint_distance_weights,
+                          double default_joint_distance_weight) {
+          auto distance_fn = MakeWeightedConfigurationDistanceFunction(
+              model->plant(), robot_model_instances,
+              named_joint_distance_weights, default_joint_distance_weight);
+          auto params = CollisionCheckerParams{std::move(model),
+              robot_model_instances, distance_fn, edge_step_size,
+              env_collision_padding, self_collision_padding};
+          return std::make_unique<Class>(std::move(params));
+        }),
+            py::arg("model"), py::arg("robot_model_instances"),
+            py::arg("edge_step_size"), py::arg("env_collision_padding"),
+            py::arg("self_collision_padding"),
+            py::arg("named_joint_distance_weights"),
+            py::arg("default_joint_distance_weight"), "")
+        .def(
+            "VoxelizeEnvironment",
+            [](Class* self, const Eigen::Vector3d& grid_size,
+                const double grid_resolution) {
+              std::unordered_set<drake::geometry::GeometryId> robot_geometries;
+              for (const auto& model_index : self->robot_model_instances()) {
+                const std::vector<BodyIndex> bodies =
+                    self->plant().GetBodyIndices(model_index);
+                for (const BodyIndex& body_index : bodies) {
+                  const Body<double>& body = self->plant().get_body(body_index);
+                  const std::vector<drake::geometry::GeometryId>& geoms =
+                      self->plant().GetCollisionGeometriesForBody(body);
+                  for (const drake::geometry::GeometryId geom_id : geoms) {
+                    robot_geometries.insert(geom_id);
+                  }
+                }
+              }
+
+              auto transform = Eigen::Isometry3d::Identity();
+              transform.translation() = -grid_size / 2;
+              const auto environment = BuildCollisionMap(self->plant(),
+                  self->plant_context(), robot_geometries, "world", transform,
+                  grid_size, grid_resolution);
+              self->UpdateEnvironment("world", environment);
+            },
+            py::arg("grid_size"), py::arg("grid_resolution"), "");
+  }
+
+  {
+    using Class = SceneGraphCollisionChecker;
+    py::class_<Class, CollisionChecker> cls(
+        m, "SceneGraphCollisionChecker", "");
+    cls  // BR
+        .def(py::init([](std::unique_ptr<RobotDiagram<double>> model,
+                          std::vector<drake::multibody::ModelInstanceIndex>
+                              robot_model_instances,
+                          double edge_step_size, double env_collision_padding,
+                          double self_collision_padding,
+                          const std::map<std::string, double>&
+                              named_joint_distance_weights,
+                          double default_joint_distance_weight) {
+          auto distance_fn = MakeWeightedConfigurationDistanceFunction(
+              model->plant(), robot_model_instances,
+              named_joint_distance_weights, default_joint_distance_weight);
+          auto params = CollisionCheckerParams{std::move(model),
+              robot_model_instances, distance_fn, edge_step_size,
+              env_collision_padding, self_collision_padding};
+          return std::make_unique<Class>(std::move(params));
+        }),
+            py::arg("model"), py::arg("robot_model_instances"),
+            py::arg("edge_step_size"), py::arg("env_collision_padding"),
+            py::arg("self_collision_padding"),
+            py::arg("named_joint_distance_weights"),
+            py::arg("default_joint_distance_weight"), "");
+  }
+
+  {
+    using Class = MbpEnvironmentCollisionChecker;
+    py::class_<Class, CollisionChecker> cls(
+        m, "MbpEnvironmentCollisionChecker", "");
+    cls.def(py::init([](std::unique_ptr<RobotDiagram<double>> model,
+                         std::vector<drake::multibody::ModelInstanceIndex>
+                             robot_model_instances,
+                         double edge_step_size, double env_collision_padding,
+                         double self_collision_padding,
+                         const std::map<std::string, double>&
+                             named_joint_distance_weights,
+                         double default_joint_distance_weight) {
+         auto distance_fn = MakeWeightedConfigurationDistanceFunction(
+             model->plant(), robot_model_instances,
+             named_joint_distance_weights, default_joint_distance_weight);
+         auto params = CollisionCheckerParams{std::move(model),
+             robot_model_instances, distance_fn, edge_step_size,
+             env_collision_padding, self_collision_padding};
+         return std::make_unique<Class>(std::move(params));
+       }),
+           py::arg("model"), py::arg("robot_model_instances"),
+           py::arg("edge_step_size"), py::arg("env_collision_padding"),
+           py::arg("self_collision_padding"),
+           py::arg("named_joint_distance_weights"),
+           py::arg("default_joint_distance_weight"), "")
+        .def("ComputePointToEnvironmentSignedDistanceAndGradient",
+            &Class::ComputePointToEnvironmentSignedDistanceAndGradient,
+            py::arg("context"), py::arg("query_object"), py::arg("p_WQ"),
+            py::arg("query_radius"), py::arg("X_WB_set"),
+            py::arg("X_WB_inverse_set"), "");
+  }
+
+  {
+    using Class = SphereRobotModelCollisionChecker;
+    py::class_<Class, CollisionChecker> cls(
+        m, "SphereRobotModelCollisionChecker", "");
+    cls.def("UpdateBodyCollisionModel", &Class::UpdateBodyCollisionModel,
+           py::arg("body_index"), py::arg("spheres"), py::arg("append"), "")
+        .def("RobotCollisionModel", &Class::RobotCollisionModel, "")
+        .def("MutableRobotCollisionModel", &Class::MutableRobotCollisionModel,
+            "")
+        .def("GetURDFCollisionGeometriesForRobotCollisionModel",
+            &Class::GetURDFCollisionGeometriesForRobotCollisionModel, "")
+        .def("CheckSelfCollisionFree",
+            overload_cast_explicit<bool, const std::vector<Eigen::Isometry3d>&>(
+                &Class::CheckSelfCollisionFree),
+            py::arg("X_WB_set"), "")
+        .def("ComputeBodyPoses", &Class::ComputeBodyPoses, py::arg("q"), "")
+        .def("GetBodyPoses", &Class::GetBodyPoses, "")
+        .def("ComputeSphereLocationsInWorldFrame",
+            overload_cast_explicit<
+                std::vector<std::unordered_map<drake::geometry::GeometryId,
+                    SphereSpecification>>,
+                const std::vector<Eigen::Isometry3d>&>(
+                &Class::ComputeSphereLocationsInWorldFrame),
+            py::arg("X_WB_set"), "")
+        .def("ComputeSphereLocationsInWorldFrame",
+            overload_cast_explicit<
+                std::vector<std::unordered_map<drake::geometry::GeometryId,
+                    SphereSpecification>>,
+                const Eigen::VectorXd&>(
+                &Class::ComputeSphereLocationsInWorldFrame),
+            py::arg("q"), "")
+        .def("RobotGeometries", &Class::RobotGeometries, "")
+        .def("ComputePointToEnvironmentSignedDistanceAndGradient",
+            &Class::ComputePointToEnvironmentSignedDistanceAndGradient,
+            py::arg("context"), py::arg("query_object"), py::arg("p_WQ"),
+            py::arg("query_radius"), py::arg("X_WB_set"),
+            py::arg("X_WB_inverse_set"), "")
+        .def("ComputePointToEnvironmentSignedDistance",
+            &Class::ComputePointToEnvironmentSignedDistance, py::arg("context"),
+            py::arg("query_object"), py::arg("p_WQ"), py::arg("query_radius"),
+            py::arg("X_WB_set"), py::arg("X_WB_inverse_set"), "")
+        .def("ComputeSelfCollisionSignedDistanceAndGradient",
+            &Class::ComputeSelfCollisionSignedDistanceAndGradient,
+            py::arg("sphere_locations_in_world_frame"),
+            py::arg("query_link_index"), py::arg("query_sphere_id"),
+            py::arg("influence_distance"), "");
   }
 
   {

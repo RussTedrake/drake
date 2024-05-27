@@ -233,6 +233,8 @@ cc_library(
     name = "libdrake_header_only_deps",
     deps = [
         "//lcmtypes:lcmtypes_drake_cc",
+        "@common_robotics_utilities",
+        "@voxelized_geometry_tools",
         "@eigen",
         "@fmt",
     ],

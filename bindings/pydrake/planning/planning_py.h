@@ -38,6 +38,12 @@ void DefinePlanningVisibilityGraph(py::module m);
 /* Defines bindings per planning_py_zmp_planner.cc. */
 void DefinePlanningZmpPlanner(py::module m);
 
+/* Defines bindings per planning_py_trajectory_optimization.cc. */
+void DefinePlanningSamplingBasedPlanners(py::module m);
+
+/* Defines bindings per planning_py_trajectory_optimization.cc. */
+void DefinePlanningCommonRoboticsUtilities(py::module m);
+
 }  // namespace internal
 }  // namespace pydrake
 }  // namespace drake
