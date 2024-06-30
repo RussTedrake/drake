@@ -101,6 +101,24 @@ class GcsTrajectoryOptimization final {
     /** Returns the number of vertices in the subgraph. */
     int size() const { return vertices_.size(); }
 
+    /** Returns "placeholder" variables corresponding to the control points of
+    the bezier curves in the subgraph. These variables can be passed to
+    AddCost(symbolic::Expression) and AddConstraint(symbolic::Formula) which
+    performs a substitution to apply the cost or constraint to each vertex in
+    the subgraph. */
+    const Eigen::MatrixX<symbolic::Variable>& control_points() const {
+      return placeholder_control_points_;
+    }
+
+    /** Returns a "placeholder" variable corresponding to the time scaling of
+    the bezier curves in the subgraph. This variable can be passed to
+    AddCost(symbolic::Expression) and AddConstraint(symbolic::Formula) which
+    performs a substitution to apply the cost or constraint to each vertex in
+    the subgraph. */
+    const symbolic::Variable& time_scaling() const {
+      return placeholder_time_scaling_;
+    }
+
     /** Returns constant reference to a vector of mutable pointers to the
     vertices stored in the subgraph. The order of the vertices is the same as
     the order the regions were added.*/
@@ -244,6 +262,24 @@ class GcsTrajectoryOptimization final {
     */
     void AddContinuityConstraints(int continuity_order);
 
+    /** Adds a user-defined cost to all of the vertices in the subgraph.
+
+    @pre The variables in cost must be a subset of the "placeholder" variables
+    returned from the control_points() and time_scaling() on this subgraph.
+    */
+    void AddCost(const symbolic::Expression& cost);
+
+    /** Adds a user-defined constraint to all of the vertices in the subgraph.
+
+    @pre The variables in cost must be a subset of the "placeholder" variables
+    returned from the control_points() and time_scaling() on this subgraph.
+    */
+    void AddConstraint(
+        const symbolic::Formula& constraint,
+        const std::unordered_set<Transcription>& use_in_transcription = {
+            Transcription::kMIP, Transcription::kRelaxation,
+            Transcription::kRestriction});
+
    private:
     /* Constructs a new subgraph and copies the regions. */
     Subgraph(const geometry::optimization::ConvexSets& regions,
@@ -284,6 +320,9 @@ class GcsTrajectoryOptimization final {
     // r(s) is a BezierCurve of the right shape and order, which can be used to
     // design costs and constraints for the underlying vertices and edges.
     trajectories::BezierCurve<double> r_trajectory_;
+
+    Eigen::MatrixX<symbolic::Variable> placeholder_control_points_;
+    symbolic::Variable placeholder_time_scaling_;
 
     friend class GcsTrajectoryOptimization;
   };
