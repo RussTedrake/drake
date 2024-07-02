@@ -20,6 +20,18 @@ filegroup(
 )
 
 filegroup(
+    name = "hello_robot_stretch",
+    srcs = [
+        "hello_robot_stretch/stretch.xml",
+        "hello_robot_stretch/LICENSE",
+    ] + glob([
+        "hello_robot_stretch/assets/*.obj",
+        "hello_robot_stretch/assets/*.png",
+        "hello_robot_stretch/assets/*.stl",
+    ])
+)
+
+filegroup(
     name = "kuka_iiwa_14",
     srcs = [
         "kuka_iiwa_14/iiwa14.xml",

@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "drake/common/find_resource.h"
+#include "drake/common/find_runfiles.h"
 #include "drake/common/fmt_eigen.h"
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
 #include "drake/common/test_utilities/expect_throws_message.h"
@@ -213,7 +214,19 @@ TYPED_TEST_P(MeshTypeSpatialInertaTest, Administrivia) {
   }
 }
 
-REGISTER_TYPED_TEST_SUITE_P(MeshTypeSpatialInertaTest, Administrivia);
+// Reproduction for issue #21666.
+TYPED_TEST_P(MeshTypeSpatialInertaTest, HelloRobotStretch) {
+  using MeshType = TypeParam;
+
+  const RlocationOrError rlocation = FindRunfile(
+      "mujoco_menagerie_internal/hello_robot_stretch/assets/base_link_0.obj");
+  ASSERT_EQ(rlocation.error, "");
+  const MeshType unit_scale_obj(rlocation.abspath, 1.0);
+  EXPECT_NO_THROW(CalcSpatialInertia(unit_scale_obj, kDensity));
+}
+
+REGISTER_TYPED_TEST_SUITE_P(MeshTypeSpatialInertaTest, Administrivia,
+                            HelloRobotStretch);
 using MeshTypes = ::testing::Types<geometry::Convex, geometry::Mesh>;
 INSTANTIATE_TYPED_TEST_SUITE_P(All, MeshTypeSpatialInertaTest, MeshTypes);
 

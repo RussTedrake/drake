@@ -689,10 +689,12 @@ drake_cc_googletest(
     data = [
         "//geometry:test_vtk_files",
         "//multibody/parsing:test_models",
+        "@mujoco_menagerie_internal//:hello_robot_stretch",
     ],
     deps = [
         ":geometry_spatial_inertia",
         "//common:find_resource",
+        "//common:find_runfiles",
         "//common/test_utilities:eigen_matrix_compare",
         "//common/test_utilities:expect_throws_message",
         "//geometry:shape_specification",
