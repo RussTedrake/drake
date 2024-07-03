@@ -442,6 +442,7 @@ class TestTrajectoryOptimization(unittest.TestCase):
         self.assertIsInstance(main1.regions(), list)
         self.assertIsInstance(main1.regions()[0], HPolyhedron)
         self.assertIn(main1, gcs.GetSubgraphs())
+        print(str(main1.Vertices()[0].GetCosts()[0]))
 
         # This adds the edges manually.
         # Doing this is much faster since it avoids computing
@@ -585,9 +586,11 @@ class TestTrajectoryOptimization(unittest.TestCase):
                                              goal2[:, None], 6)
         self.assertTrue(traj.end_time() - traj.start_time() >= 10)
 
+        gv_options = GcsGraphvizOptions()
+        #gv_options.show_costs=False
+        print(gcs.GetGraphvizString(result=result, options=gv_options))
         self.assertIsInstance(
-            gcs.GetGraphvizString(result=result,
-                                  options=GcsGraphvizOptions()), str)
+            gcs.GetGraphvizString(result=result, options=gv_options), str)
 
         # In the follwoing, we test adding the bindings for nonlinear
         # constraints.

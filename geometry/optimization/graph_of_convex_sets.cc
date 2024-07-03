@@ -151,7 +151,8 @@ std::pair<Variable, Binding<Cost>> Vertex::AddCost(
   DRAKE_THROW_UNLESS(use_in_transcription.size() > 0);
   const int n = ell_.size();
   ell_.conservativeResize(n + 1);
-  ell_[n] = Variable(fmt::format("v_ell{}", n), Variable::Type::CONTINUOUS);
+  ell_[n] =
+      Variable(fmt::format("{}_ell{}", name_, n), Variable::Type::CONTINUOUS);
   costs_.push_back({binding, use_in_transcription});
   return std::pair<Variable, Binding<Cost>>(ell_[n], binding);
 }
@@ -211,7 +212,14 @@ std::vector<solvers::Binding<solvers::Constraint>> Vertex::GetConstraints(
 }
 
 double Vertex::GetSolutionCost(const MathematicalProgramResult& result) const {
-  return result.GetSolution(ell_).sum();
+  double sum = 0.0;
+  for (int i=0; i<ssize(ell_); ++i) {
+    if (result->get_decision_variable_index()->contains(
+           ell_[i].get_id())) {
+      sum += result.GetSolution(ell_[i]);
+    }
+  }
+  return sum;
 }
 
 VectorXd Vertex::GetSolution(const MathematicalProgramResult& result) const {
@@ -277,7 +285,7 @@ std::pair<Variable, Binding<Cost>> Edge::AddCost(
   const int n = ell_.size();
   ell_.conservativeResize(n + 1);
   ell_[n] =
-      Variable(fmt::format("{}ell{}", name_, n), Variable::Type::CONTINUOUS);
+      Variable(fmt::format("{}_ell{}", name_, n), Variable::Type::CONTINUOUS);
   costs_.push_back({binding, use_in_transcription});
   return std::pair<Variable, Binding<Cost>>(ell_[n], binding);
 }
@@ -1205,10 +1213,12 @@ MathematicalProgramResult GraphOfConvexSets::SolveShortestPath(
     const std::vector<Edge*>& cost_edges = is_target ? incoming : outgoing;
 
     // Vertex costs.
+    int num_vertex_costs = 0;
     if (v->ell_.size() > 0) {
       for (int ii = 0; ii < v->ell_.size(); ++ii) {
         const auto& [b, transcriptions] = v->costs_[ii];
         if (IncludesCurrentTranscription(transcriptions)) {
+          ++num_vertex_costs;
           VectorXDecisionVariable vertex_ell =
               prog.NewContinuousVariables(cost_edges.size());
           vertex_edge_ell[v->id()].push_back(vertex_ell);
@@ -1273,7 +1283,8 @@ MathematicalProgramResult GraphOfConvexSets::SolveShortestPath(
           ? " and rounding"
           : " and no rounding");
 
-  {  // Push the placeholder variables and excluded edge variables into the
+  {
+    // Push the placeholder variables and excluded edge variables into the
     // result, so that they can be accessed as if they were variables included
     // in the optimization.
     int num_placeholder_vars = relaxed_phi.size();
@@ -1716,10 +1727,7 @@ MathematicalProgramResult GraphOfConvexSets::SolveConvexRestriction(
   for (const auto& pair : edges_) {
     const Edge* e = pair.second.get();
     decision_variable_index.emplace(e->phi_.get_id(), count);
-    x_val[count++] = std::find(active_edges.begin(), active_edges.end(), e) !=
-                             active_edges.end()
-                         ? 1.0
-                         : 0.0;
+    x_val[count++] = active_edges.contains(e) ? 1.0 : 0.0;
   }
   for (const Vertex* v : excluded_vertices) {
     for (int i = 0; i < v->x().size(); ++i) {
@@ -1727,6 +1735,7 @@ MathematicalProgramResult GraphOfConvexSets::SolveConvexRestriction(
       x_val[count++] = std::numeric_limits<double>::quiet_NaN();
     }
   }
+  DRAKE_DEMAND(count == x_val.size());
   result.set_decision_variable_index(decision_variable_index);
   result.set_x_val(x_val);
 
