@@ -1775,6 +1775,45 @@ TEST_F(MujocoParserTest, ContactThrows) {
       ".*no RigidBody named 'QQQ' anywhere.*");
 }
 
+TEST_F(MujocoParserTest, EqualityTest) {
+  std::string xml = R"""(
+<mujoco model="test">
+  <worldbody>
+    <body name="body1">
+      <geom type="box" size="0.1 0.2 0.3"/>
+      <joint type="hinge" pos="-1 0 0"/>
+    </body>
+    <body name="body2">
+      <geom type="box" size="0.1 0.2 0.3"/>
+      <joint type="hinge" pos="1 0 0"/>
+    </body>
+  </worldbody>
+  <equality>
+    <connect body1="body1" anchor="1 2 3" body2="body2"/>
+  </equality>
+</mujoco>
+)""";
+
+  AddModelFromString(xml, "test");
+  plant_.Finalize();
+
+  const auto constraint_ids = plant_.GetConstraintIds();
+  EXPECT_EQ(constraint_ids.size(), 1);
+  const auto& specs = plant_.get_ball_constraint_specs(constraint_ids[0]);
+  EXPECT_EQ(specs.body_A, plant_.GetBodyByName("body1").index());
+  EXPECT_EQ(specs.body_B, plant_.GetBodyByName("body2").index());
+  Vector3d p_AP(1, 2, 3);
+  EXPECT_TRUE(CompareMatrices(specs.p_AP, p_AP));
+  // body1 is attached at -1, 0, 0, and body2 is attached at 1, 0, 0.
+  RigidTransformd X_BA(Vector3d(2, 0, 0));
+  Vector3d p_BQ = X_BA * p_AP;
+  EXPECT_TRUE(CompareMatrices(specs.p_BQ, p_BQ, 1e-14));
+}
+
+TEST_F(MujocoParserTest, BadEqualityTest) {
+  // TODO(russt): Check warnings and errors.
+}
+
 }  // namespace
 }  // namespace internal
 }  // namespace multibody
