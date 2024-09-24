@@ -64,8 +64,7 @@ class MujocoParser {
   explicit MujocoParser(const ParsingWorkspace& workspace,
                         const DataSource& data_source)
       : workspace_(workspace),
-        diagnostic_(&workspace.diagnostic, &data_source),
-        plant_(workspace.plant) {
+        diagnostic_(&workspace.diagnostic, &data_source) {
     // Clang complains that the workspace_ field is unused. Nerf the warning
     // for now; it will be used soon.
     unused(workspace_);
@@ -199,11 +198,11 @@ class MujocoParser {
     return limited;
   }
 
-  void ParseMotor(XMLElement* node) {
+  void ParseMotor(XMLElement* node, MultibodyPlant<double>* plant) {
     std::string name;
     if (!ParseStringAttribute(node, "name", &name)) {
       // Use "motor#" as the default actuator name.
-      name = fmt::format("motor{}", plant_->num_actuators());
+      name = fmt::format("motor{}", plant->num_actuators());
     }
 
     std::string joint_name;
@@ -282,15 +281,15 @@ class MujocoParser {
     WarnUnsupportedAttribute(*node, "slidersite");
     WarnUnsupportedAttribute(*node, "user");
 
-    plant_->AddJointActuator(
-        name, plant_->GetJointByName(joint_name, model_instance_),
+    plant->AddJointActuator(
+        name, plant->GetJointByName(joint_name, model_instance_),
         effort_limit);
   }
 
-  void ParseActuator(XMLElement* node) {
+  void ParseActuator(XMLElement* node, MultibodyPlant<double>* plant) {
     for (XMLElement* motor_node = node->FirstChildElement("motor"); motor_node;
          motor_node = motor_node->NextSiblingElement("motor")) {
-      ParseMotor(motor_node);
+      ParseMotor(motor_node, plant);
     }
     WarnUnsupportedElement(*node, "general");
     WarnUnsupportedElement(*node, "position");
@@ -301,7 +300,7 @@ class MujocoParser {
 
   void ParseJoint(XMLElement* node, const RigidBody<double>& parent,
                   const RigidBody<double>& child, const RigidTransformd& X_WC,
-                  const RigidTransformd& X_PC,
+                  const RigidTransformd& X_PC, MultibodyPlant<double>* plant,
                   const std::string& child_class = "") {
     std::string name;
     if (!ParseStringAttribute(node, "name", &name)) {
@@ -351,26 +350,26 @@ class MujocoParser {
                     "supported for free bodies.",
                     name));
       }
-      plant_->SetDefaultFreeBodyPose(child, X_WC);
+      plant->SetDefaultFreeBodyPose(child, X_WC);
     } else if (type == "ball") {
-      plant_->AddJoint<BallRpyJoint>(name, parent, X_PJ, child, X_CJ, damping);
+      plant->AddJoint<BallRpyJoint>(name, parent, X_PJ, child, X_CJ, damping);
       if (limited) {
         WarnUnsupportedAttribute(*node, "range");
       }
     } else if (type == "slide") {
       JointIndex index =
-          plant_
+          plant
               ->AddJoint<PrismaticJoint>(
                   name, parent, X_PJ, child, X_CJ, axis,
                   -std::numeric_limits<double>::infinity(),
                   std::numeric_limits<double>::infinity(), damping)
               .index();
       if (limited) {
-        plant_->get_mutable_joint(index).set_position_limits(
+        plant->get_mutable_joint(index).set_position_limits(
             Vector1d{range[0]}, Vector1d{range[1]});
       }
     } else if (type == "hinge") {
-      JointIndex index = plant_
+      JointIndex index = plant
                              ->AddJoint<RevoluteJoint>(
                                  name, parent, X_PJ, child, X_CJ, axis, damping)
                              .index();
@@ -378,7 +377,7 @@ class MujocoParser {
         if (angle_ == kDegree) {
           range *= (M_PI / 180.0);
         }
-        plant_->get_mutable_joint(index).set_position_limits(
+        plant->get_mutable_joint(index).set_position_limits(
             Vector1d{range[0]}, Vector1d{range[1]});
       }
     } else {
@@ -847,12 +846,12 @@ class MujocoParser {
   }
 
   void ParseBody(XMLElement* node, const RigidBody<double>& parent,
-                 const RigidTransformd& X_WP,
+                 const RigidTransformd& X_WP, MultibodyPlant<double>* plant,
                  const std::string& parent_class = "") {
     std::string body_name;
     if (!ParseStringAttribute(node, "name", &body_name)) {
       // Use "body#" as the default body name.
-      body_name = fmt::format("body{}", plant_->num_bodies());
+      body_name = fmt::format("body{}", plant->num_bodies());
     }
 
     std::string child_class;
@@ -900,16 +899,16 @@ class MujocoParser {
 
     // Add a rigid body to model each link.
     const RigidBody<double>& body =
-        plant_->AddRigidBody(body_name, model_instance_, M_BBo_B);
+        plant->AddRigidBody(body_name, model_instance_, M_BBo_B);
 
-    if (plant_->geometry_source_is_registered()) {
+    if (plant->geometry_source_is_registered()) {
       for (auto& geom : geometries) {
         if (geom.register_visual) {
-          plant_->RegisterVisualGeometry(body, geom.X_BG, *geom.shape,
+          plant->RegisterVisualGeometry(body, geom.X_BG, *geom.shape,
                                          geom.name, geom.rgba);
         }
         if (geom.register_collision) {
-          plant_->RegisterCollisionGeometry(body, geom.X_BG, *geom.shape,
+          plant->RegisterCollisionGeometry(body, geom.X_BG, *geom.shape,
                                             geom.name, geom.friction);
         }
       }
@@ -927,14 +926,15 @@ class MujocoParser {
       int dummy_bodies = 0;
       for (; joint_node; joint_node = joint_node->NextSiblingElement("joint")) {
         if (joint_node->NextSiblingElement("joint")) {
-          const RigidBody<double>& dummy_body = plant_->AddRigidBody(
+          const RigidBody<double>& dummy_body = plant->AddRigidBody(
               fmt::format("{}{}", body_name, dummy_bodies++), model_instance_,
               SpatialInertia<double>::Zero());
           ParseJoint(joint_node, *last_body, dummy_body, X_WP,
-                     RigidTransformd(), child_class);
+                     RigidTransformd(), plant, child_class);
           last_body = &dummy_body;
         } else {
-          ParseJoint(joint_node, *last_body, body, X_WB, X_PB, child_class);
+          ParseJoint(joint_node, *last_body, body, X_WB, X_PB, plant,
+                     child_class);
         }
 
         std::string type;
@@ -954,9 +954,9 @@ class MujocoParser {
       if (XMLElement* freejoint_node = node->FirstChildElement("freejoint")) {
         WarnUnsupportedElement(*freejoint_node, "name");
         WarnUnsupportedElement(*freejoint_node, "group");
-        plant_->SetDefaultFreeBodyPose(body, X_WB);
+        plant->SetDefaultFreeBodyPose(body, X_WB);
       } else {
-        plant_->WeldFrames(parent.body_frame(), body.body_frame(), X_PB);
+        plant->WeldFrames(parent.body_frame(), body.body_frame(), X_PB);
       }
     }
 
@@ -971,23 +971,23 @@ class MujocoParser {
     // Parses child body elements.
     for (XMLElement* link_node = node->FirstChildElement("body"); link_node;
          link_node = link_node->NextSiblingElement("body")) {
-      ParseBody(link_node, body, X_WB, child_class);
+      ParseBody(link_node, body, X_WB, plant, child_class);
     }
   }
 
-  void ParseWorldBody(XMLElement* node) {
-    if (plant_->geometry_source_is_registered()) {
+  void ParseWorldBody(XMLElement* node, MultibodyPlant<double>* plant) {
+    if (plant->geometry_source_is_registered()) {
       int num_geometries = 0;
       for (XMLElement* link_node = node->FirstChildElement("geom"); link_node;
            link_node = link_node->NextSiblingElement("geom")) {
         auto geom = ParseGeometry(link_node, num_geometries, false);
         if (!geom.shape) continue;
         if (geom.register_visual) {
-          plant_->RegisterVisualGeometry(plant_->world_body(), geom.X_BG,
+          plant->RegisterVisualGeometry(plant->world_body(), geom.X_BG,
                                          *geom.shape, geom.name, geom.rgba);
         }
         if (geom.register_collision) {
-          plant_->RegisterCollisionGeometry(plant_->world_body(), geom.X_BG,
+          plant->RegisterCollisionGeometry(plant->world_body(), geom.X_BG,
                                             *geom.shape, geom.name,
                                             geom.friction);
         }
@@ -1003,7 +1003,7 @@ class MujocoParser {
     // Parses child body elements.
     for (XMLElement* link_node = node->FirstChildElement("body"); link_node;
          link_node = link_node->NextSiblingElement("body")) {
-      ParseBody(link_node, plant_->world_body(), RigidTransformd());
+      ParseBody(link_node, plant->world_body(), RigidTransformd(), plant);
     }
   }
 
@@ -1206,7 +1206,7 @@ class MujocoParser {
     WarnUnsupportedElement(*node, "skin");
   }
 
-  void ParseOption(XMLElement* node) {
+  void ParseOption(XMLElement* node, MultibodyPlant<double>* plant) {
     WarnUnsupportedAttribute(*node, "timestep");
     WarnUnsupportedAttribute(*node, "apirate");
     WarnUnsupportedAttribute(*node, "impratio");
@@ -1215,7 +1215,7 @@ class MujocoParser {
     if (ParseVectorAttribute(node, "gravity", &gravity)) {
       // Note: This changes gravity for the entire plant (including models that
       // existed before this parser).
-      plant_->mutable_gravity_field().set_gravity_vector(gravity);
+      plant->mutable_gravity_field().set_gravity_vector(gravity);
     }
 
     WarnUnsupportedAttribute(*node, "wind");
@@ -1335,14 +1335,14 @@ class MujocoParser {
     WarnUnsupportedElement(*node, "lengthrange");
   }
 
-  void ParseContact(XMLElement* node) {
-    if (!plant_->geometry_source_is_registered()) {
+  void ParseContact(XMLElement* node, MultibodyPlant<double>* plant) {
+    if (!plant->geometry_source_is_registered()) {
       // No need to parse contacts if there is no SceneGraph registered.
       return;
     }
 
     geometry::SceneGraph<double>* scene_graph =
-        plant_->GetMutableSceneGraphPreFinalize();
+        plant->GetMutableSceneGraphPreFinalize();
     geometry::CollisionFilterManager manager =
         scene_graph->collision_filter_manager();
     const geometry::SceneGraphInspector<double>& inspector =
@@ -1414,18 +1414,18 @@ class MujocoParser {
       WarnUnsupportedAttribute(*pair_node, "margin");
       WarnUnsupportedAttribute(*pair_node, "gap");
 
-      if (plant_->get_adjacent_bodies_collision_filters()) {
+      if (plant->get_adjacent_bodies_collision_filters()) {
         // If true, then Finalize will declare a collision filter which
         // excludes joint parent/child bodies. Check that we don't have any
         // joints that would overwrite this setting during Finalize (Note that
         // all joints have already been parsed.)
         const BodyIndex body1_index =
-            plant_->GetBodyFromFrameId(inspector.GetFrameId(geom1_id))->index();
+            plant->GetBodyFromFrameId(inspector.GetFrameId(geom1_id))->index();
         const BodyIndex body2_index =
-            plant_->GetBodyFromFrameId(inspector.GetFrameId(geom2_id))->index();
+            plant->GetBodyFromFrameId(inspector.GetFrameId(geom2_id))->index();
         for (const auto& joint_index :
-             plant_->GetJointIndices(model_instance_)) {
-          const Joint<double>& joint = plant_->get_joint(joint_index);
+             plant->GetJointIndices(model_instance_)) {
+          const Joint<double>& joint = plant->get_joint(joint_index);
           if ((joint.parent_body().index() == body1_index &&
                joint.child_body().index() == body2_index) ||
               (joint.parent_body().index() == body2_index &&
@@ -1463,16 +1463,18 @@ class MujocoParser {
         continue;
       }
 
-      geometry::FrameId fid1 = plant_->GetBodyFrameIdOrThrow(
-          plant_->GetBodyByName(body1, model_instance_).index());
-      geometry::FrameId fid2 = plant_->GetBodyFrameIdOrThrow(
-          plant_->GetBodyByName(body2, model_instance_).index());
+      geometry::FrameId fid1 = plant->GetBodyFrameIdOrThrow(
+          plant->GetBodyByName(body1, model_instance_).index());
+      geometry::FrameId fid2 = plant->GetBodyFrameIdOrThrow(
+          plant->GetBodyByName(body2, model_instance_).index());
       manager.Apply(geometry::CollisionFilterDeclaration().ExcludeBetween(
           geometry::GeometrySet(fid1), geometry::GeometrySet(fid2)));
     }
   }
 
-  void ParseEquality(XMLElement* node) {
+  void ParseEquality(XMLElement* node,
+                     const MultibodyPlant<double>& finalized_plant,
+                     MultibodyPlant<double>* plant) {
     // Per the mujoco docs: "The actual equality constraints have types
     // depending on the sub-element used to define them. However here we are
     // setting attributes common to all equality constraint types, which is why
@@ -1489,14 +1491,7 @@ class MujocoParser {
       }
     };
 
-    // Some of the computations required for processing these constraint
-    // require kinematics computations, which are only available post-finalize.
-    // To accomplish this, we make a clone of the plant here, and operate on
-    // that.
-    std::unique_ptr<MultibodyPlant<double>> cloned_plant =
-        systems::System<double>::Clone(*plant_);
-    cloned_plant->Finalize();
-    auto context = cloned_plant->CreateDefaultContext();
+    auto context = finalized_plant.CreateDefaultContext();
 
     for (XMLElement* connect_node = node->FirstChildElement("connect");
          connect_node;
@@ -1515,21 +1510,22 @@ class MujocoParser {
                 "connect specified body1 was does not have the required anchor "
                 "attribute.");
         }
-        const RigidBody<double>& body_A = plant_->GetBodyByName(body1);
-        const RigidBody<double>* body_B = &plant_->world_body();
+        const RigidBody<double>& body_A = plant->GetBodyByName(body1);
+        const RigidBody<double>* body_B = &plant->world_body();
         std::string body2;
         if (ParseStringAttribute(connect_node, "body2", &body2)) {
-          body_B = &plant_->GetBodyByName(body2);
+          body_B = &plant->GetBodyByName(body2);
         }
         // Per the mujoco docs: "The constraint is assumed to be satisfied in
         // the configuration in which the model is defined, which lets the
         // compiler compute the associated anchor point for body2."
         Vector3d p_BQ;
-        cloned_plant->CalcPointsPositions(
-            *context, cloned_plant->get_body(body_A.index()).body_frame(), p_AP,
-            cloned_plant->get_body(body_B->index()).body_frame(), &p_BQ);
+        finalized_plant.CalcPointsPositions(
+            *context, finalized_plant.get_body(body_A.index()).body_frame(),
+            p_AP, finalized_plant.get_body(body_B->index()).body_frame(),
+            &p_BQ);
 
-        plant_->AddBallConstraint(body_A, p_AP, *body_B, p_BQ);
+        plant->AddBallConstraint(body_A, p_AP, *body_B, p_BQ);
       } else {
         std::string site1, site2;
         if (!ParseStringAttribute(connect_node, "site1", &site1) ||
@@ -1634,7 +1630,8 @@ class MujocoParser {
       const std::string& model_name_in,
       const std::optional<std::string>& parent_model_name,
       std::optional<ModelInstanceIndex> merge_into_model_instance,
-      XMLDocument* xml_doc, const std::filesystem::path& main_mjcf_path) {
+      XMLDocument* xml_doc, const std::filesystem::path& main_mjcf_path,
+      MultibodyPlant<double>* plant) {
     main_mjcf_path_ = main_mjcf_path;
 
     XMLElement* node = xml_doc->FirstChildElement("mujoco");
@@ -1655,9 +1652,15 @@ class MujocoParser {
       return {};
     }
 
+    // Some of the model parsing requires kinematic computations, which requires
+    // a finalized plant. Currently calling Clone() on an unfinalized
+    // MultibodyPlant is not supported. So as a very painful workaround, we will
+    // parse into a second plant.
+    MultibodyPlant<double> second_plant(0.0);
+
     if (!merge_into_model_instance.has_value()) {
       model_name = MakeModelName(model_name, parent_model_name, workspace_);
-      model_instance_ = plant_->AddModelInstance(model_name);
+      model_instance_ = plant->AddModelInstance(model_name);
     } else {
       model_instance_ = *merge_into_model_instance;
     }
@@ -1672,7 +1675,7 @@ class MujocoParser {
     // Parse the options.
     for (XMLElement* option_node = node->FirstChildElement("option");
          option_node; option_node = option_node->NextSiblingElement("option")) {
-      ParseOption(option_node);
+      ParseOption(option_node, plant);
     }
 
     // Parse the defaults.
@@ -1692,34 +1695,34 @@ class MujocoParser {
     // Parses the model's world link elements.
     for (XMLElement* link_node = node->FirstChildElement("worldbody");
          link_node; link_node = link_node->NextSiblingElement("worldbody")) {
-      ParseWorldBody(link_node);
+      ParseWorldBody(link_node, plant);
     }
 
     // Parses the model's link elements.
     for (XMLElement* link_node = node->FirstChildElement("body"); link_node;
          link_node = link_node->NextSiblingElement("body")) {
-      ParseBody(link_node, plant_->world_body(), RigidTransformd());
+      ParseBody(link_node, plant->world_body(), RigidTransformd(), plant);
     }
 
     // Parses the model's actuator elements.
     for (XMLElement* actuator_node = node->FirstChildElement("actuator");
          actuator_node;
          actuator_node = actuator_node->NextSiblingElement("actuator")) {
-      ParseActuator(actuator_node);
+      ParseActuator(actuator_node, plant);
     }
 
     // Parses the model's contact elements.
     for (XMLElement* contact_node = node->FirstChildElement("contact");
          contact_node;
          contact_node = contact_node->NextSiblingElement("contact")) {
-      ParseContact(contact_node);
+      ParseContact(contact_node, plant);
     }
 
     // Parses the model's equality elements.
     for (XMLElement* equality_node = node->FirstChildElement("equality");
          equality_node;
          equality_node = equality_node->NextSiblingElement("equality")) {
-      ParseEquality(equality_node);
+      ParseEquality(equality_node, plant);
     }
 
     WarnUnsupportedElement(*node, "size");
@@ -1755,7 +1758,6 @@ class MujocoParser {
  private:
   const ParsingWorkspace& workspace_;
   TinyXml2Diagnostic diagnostic_;
-  MultibodyPlant<double>* plant_;
   ModelInstanceIndex model_instance_{};
   std::filesystem::path main_mjcf_path_{};
   bool autolimits_{true};
