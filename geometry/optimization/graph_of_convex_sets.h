@@ -685,6 +685,9 @@ class GraphOfConvexSets {
   */
   void RemoveEdge(Edge* edge);
 
+  int num_vertices() const { return vertices_.size(); }
+  int num_edges() const { return edges_.size(); }
+
   /** Returns mutable pointers to the vertices stored in the graph. */
   std::vector<Vertex*> Vertices();
 
