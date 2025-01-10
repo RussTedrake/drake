@@ -88,6 +88,7 @@ drake_cc_library(
         "//common:scope_exit",
         "//geometry:meshcat",
         "//geometry:meshcat_graphviz",
+        "//multibody/inverse_kinematics",
         "//multibody/plant",
     ],
 )

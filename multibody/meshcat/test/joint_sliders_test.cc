@@ -76,7 +76,7 @@ TEST_F(JointSlidersTest, NarrowConstructor) {
   joint_2.set_position_limits(Vector1d(min_angle_2), Vector1d(max_angle_2));
 
   // Add the sliders.
-  const JointSliders<double> dut(meshcat_, &plant_);
+  const JointSliders dut(meshcat_, &plant_);
   auto context = dut.CreateDefaultContext();
 
   // Sliders start at their default context value.
@@ -210,7 +210,7 @@ TEST_F(JointSlidersTest, DuplicatedJointNames) {
   plant_.Finalize();
 
   // Add the sliders.
-  const JointSliders<double> dut(meshcat_, &plant_);
+  const JointSliders dut(meshcat_, &plant_);
 
   // TODO(rpoyner-tri): We would probably prefer slashes for names nesting on
   // sliders labels.
@@ -227,7 +227,7 @@ TEST_F(JointSlidersTest, DuplicatedJointNames) {
 TEST_F(JointSlidersTest, MultiDofJoint) {
   Add("package://drake/multibody/meshcat/test/universal_joint.sdf");
   plant_.Finalize();
-  const JointSliders<double> dut(meshcat_, &plant_);
+  const JointSliders dut(meshcat_, &plant_);
 
   // Confirm the names hasve the per-dof suffix.
   EXPECT_EQ(meshcat_->GetSliderValue("charlie_qx"), 0.0);
@@ -240,7 +240,7 @@ TEST_F(JointSlidersTest, MultiDofJoint) {
 TEST_F(JointSlidersTest, FreeBody) {
   Add("package://drake/multibody/models/box.urdf");
   plant_.Finalize();
-  const JointSliders<double> dut(meshcat_, &plant_);
+  const JointSliders dut(meshcat_, &plant_);
   EXPECT_EQ(dut.get_output_port().size(), 7);
 }
 
@@ -248,7 +248,7 @@ TEST_F(JointSlidersTest, FreeBody) {
 TEST_F(JointSlidersTest, DeleteFunction) {
   // Add the sliders.
   AddAcrobot();
-  auto dut = std::make_unique<JointSliders<double>>(meshcat_, &plant_);
+  auto dut = std::make_unique<JointSliders>(meshcat_, &plant_);
   EXPECT_EQ(meshcat_->GetSliderValue(kAcrobotJoint1), 0.0);
 
   // Remove them; confirm that they are gone.
@@ -266,7 +266,7 @@ TEST_F(JointSlidersTest, DeleteFunction) {
 TEST_F(JointSlidersTest, Destructor) {
   // Add the sliders.
   AddAcrobot();
-  auto dut = std::make_unique<JointSliders<double>>(meshcat_, &plant_);
+  auto dut = std::make_unique<JointSliders>(meshcat_, &plant_);
   EXPECT_EQ(meshcat_->GetSliderValue(kAcrobotJoint1), 0.0);
 
   // Delete the entire object; confirm that the sliders are gone.
@@ -281,7 +281,7 @@ TEST_F(JointSlidersTest, Run) {
 
   Vector2d initial_value{0.12, 0.34};
   MeshcatVisualizer<double>::AddToBuilder(&builder_, scene_graph_, meshcat_);
-  auto* dut = builder_.AddSystem<JointSliders<double>>(meshcat_, &plant_,
+  auto* dut = builder_.AddSystem<JointSliders>(meshcat_, &plant_,
                                                        initial_value);
 
   auto init_system = builder_.AddSystem<systems::InitializationTestSystem>();
@@ -323,7 +323,7 @@ TEST_F(JointSlidersTest, Run) {
 // Tests that SetPositions diagnoses num_positions mismatches.
 TEST_F(JointSlidersTest, SetPositionsWrongNumPositions) {
   AddAcrobot();
-  JointSliders<double> dut(meshcat_, &plant_);
+  JointSliders dut(meshcat_, &plant_);
   DRAKE_EXPECT_THROWS_MESSAGE(
       dut.SetPositions(Vector1d::Zero()),
       "Expected q of size 2, but got size 1 instead");
@@ -334,7 +334,7 @@ TEST_F(JointSlidersTest, SetPositionsWrongNumPositions) {
 TEST_F(JointSlidersTest, SetPositionsAcrobot) {
   // Acrobot has two positions, both of them joints.
   AddAcrobot();
-  JointSliders<double> dut(meshcat_, &plant_);
+  JointSliders dut(meshcat_, &plant_);
   auto context = dut.CreateDefaultContext();
   ASSERT_EQ(dut.get_output_port().size(), 2);
 
@@ -379,7 +379,7 @@ TEST_F(JointSlidersTest, SetPositionsKukaIiwaRobot) {
   Add("package://drake_models/iiwa_description/urdf/"
       "iiwa14_primitive_collision.urdf");
   plant_.Finalize();
-  JointSliders<double> dut(meshcat_, &plant_);
+  JointSliders dut(meshcat_, &plant_);
   auto context = dut.CreateDefaultContext();
   EXPECT_EQ(dut.get_output_port().size(), 14);
 
@@ -432,7 +432,7 @@ TEST_F(JointSlidersTest, SetPositionsKukaIiwaRobot) {
 
 TEST_F(JointSlidersTest, Graphviz) {
   AddAcrobot();
-  const JointSliders<double> dut(meshcat_, &plant_);
+  const JointSliders dut(meshcat_, &plant_);
   EXPECT_THAT(dut.GetGraphvizString(),
               testing::HasSubstr("meshcat_out ->"));
 }

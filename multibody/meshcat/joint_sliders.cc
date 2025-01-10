@@ -13,6 +13,7 @@
 #include "drake/common/scope_exit.h"
 #include "drake/common/unused.h"
 #include "drake/geometry/meshcat_graphviz.h"
+#include "drake/solvers/solve.h"
 
 namespace drake {
 namespace multibody {
@@ -129,8 +130,8 @@ VectorXd Broadcast(
 
 template <typename T>
 JointSliders<T>::JointSliders(
-    std::shared_ptr<geometry::Meshcat> meshcat, const MultibodyPlant<T>* plant,
-    std::optional<VectorXd> initial_value,
+    std::shared_ptr<geometry::Meshcat> meshcat,
+    const MultibodyPlant<double>* plant, std::optional<VectorXd> initial_value,
     std::variant<std::monostate, double, VectorXd> lower_limit,
     std::variant<std::monostate, double, VectorXd> upper_limit,
     std::variant<std::monostate, double, VectorXd> step,
@@ -295,6 +296,7 @@ Eigen::VectorXd JointSliders<T>::Run(const Diagram<T>& diagram,
   const auto start_time = Clock::now();
 
   diagram.ExecuteInitializationEvents(root_context.get());
+  InverseKinematics ik(*plant_);
 
   // Set the context to the initial slider values.
   plant_->SetPositions(&plant_context,
@@ -318,8 +320,33 @@ Eigen::VectorXd JointSliders<T>::Run(const Diagram<T>& diagram,
       continue;
     }
 
+    // To resolve constraints, we'll use an IK problem formulated as:
+    // min_q |q - q_sliders|^2
+    // s.t. q[just_updated_index] == q_sliders[just_updated_index]
+    //      additional constraints from AddMultibodyPlantConstraints.
+    solvers::Binding<solvers::QuadraticCost> cost =
+        ik.get_mutable_prog()->AddQuadraticErrorCost(1, new_positions, ik.q());
+    std::vector<solvers::Binding<solvers::Constraint>> constraints;
+    for (int i = 0; i < plant_->num_positions(); ++i) {
+      if (new_positions[i] != old_positions[i]) {
+        constraints.push_back(
+            ik.get_mutable_prog()->AddBoundingBoxConstraint(
+                new_positions[i], new_positions[i], ik.q()[i]));
+      }
+    }
+    auto result = solvers::Solve(ik.prog());
+    if (result.is_success()) {
+      plant_->SetPositions(&plant_context, result.GetSolution(ik.q()));
+    } else {
+      plant_->SetPositions(&plant_context, new_positions);
+      log()->warn("Failed to resolve constraints");
+    }
+    ik.get_mutable_prog()->RemoveCost(cost);
+    for (const auto& constraint : constraints) {
+      ik.get_mutable_prog()->RemoveConstraint(constraint);
+    }
+
     // Publish the new positions.
-    plant_->SetPositions(&plant_context, new_positions);
     diagram.ForcedPublish(diagram_context);
   }
 

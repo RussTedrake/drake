@@ -151,7 +151,7 @@ class JointSliders final : public systems::LeafSystem<T> {
       const final;
 
   std::shared_ptr<geometry::Meshcat> meshcat_;
-  const MultibodyPlant<T>* const plant_;
+  const MultibodyPlant<double>* const plant_;
   const std::map<int, std::string> position_names_;
   /* The nominal values for all positions; positions with sliders will not use
    their nominal value except for defining the slider's initial value. */
