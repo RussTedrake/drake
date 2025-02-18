@@ -1261,7 +1261,6 @@ class MujocoParser {
     parse_class_defaults("light");
     parse_class_defaults("pair");
     parse_class_defaults("tendon");
-    parse_class_defaults("general");
     parse_class_defaults("motor");
     parse_class_defaults("position");
     parse_class_defaults("velocity");
@@ -1274,6 +1273,11 @@ class MujocoParser {
          default_node = default_node->NextSiblingElement("default")) {
       ParseDefault(default_node, class_name);
     }
+
+    // TODO(russt): This appears to get applied to every element type... "All
+    // general attributes are available here except: name, class, joint,
+    // jointinparent, site, refsite, tendon, slidersite, cranksite."
+    WarnUnsupportedElement(*node, "general");
   }
 
   void ParseAsset(XMLElement* node) {
@@ -1786,6 +1790,110 @@ class MujocoParser {
     WarnUnsupportedElement(*node, "distance");  // removed in MuJoCo 2.2.2
   }
 
+  void ParseFixedTendon(XMLElement* node) {
+    std::string class_name;
+    if (!ParseStringAttribute(node, "class", &class_name)) {
+      class_name = "main";
+    }
+    ApplyDefaultAttributes("tendon", class_name, node);
+
+    log()->info("fixed tendon attributes:");
+    for (const XMLAttribute* attr = node->FirstAttribute(); attr;
+         attr = attr->Next()) {
+      log()->info("  {} = {}", attr->Name(), fmt_debug_string(attr->Value()));
+    }
+
+    std::vector<std::string> joint_names;
+    std::vector<double> coefficients;
+    for (XMLElement* joint_node = node->FirstChildElement("joint"); joint_node;
+         joint_node = joint_node->NextSiblingElement("joint")) {
+      // The default/tendon documentation states that "All tendon sub-element
+      // attributes are available here except: name, class."
+      ApplyDefaultAttributes("tendon", class_name, joint_node);
+
+      log()->info("fixed tendon joint attributes:");
+      for (const XMLAttribute* attr = joint_node->FirstAttribute(); attr;
+          attr = attr->Next()) {
+        log()->info("  {} = {}", attr->Name(), fmt_debug_string(attr->Value()));
+      }
+
+      std::string joint_name;
+      double coefficient;
+      if (!ParseStringAttribute(joint_node, "joint", &joint_name)) {
+        Error(*node, "joint node does not have a required joint attribute.");
+        return;
+      }
+      if (!ParseScalarAttribute(joint_node, "coef", &coefficient)) {
+        Error(*node, "joint node does not have a required coef attribute.");
+        return;
+      }
+      joint_names.push_back(joint_name);
+      coefficients.push_back(coefficient);
+    }
+
+    // We currently only support fixed tendons with exactly two joints -- these
+    // correspond to the existing "coupler constraint" concept in
+    // MultibodyPlant. It would not be too difficult to support the more
+    // general case, but will require a new or expanded constraint type in
+    // MultibodyPlant.
+    if (joint_names.size() != 2) {
+      Warning(*node,
+              "Drake currently only supports fixed tendons specifying exactly "
+              "two joints; this tendon will be ignored.");
+      return;
+    }
+
+    log()->info("parsing fixed tendon: {} {}", joint_names[0], joint_names[1]);
+    std::vector<const Joint<double>*> joints;
+    for (const std::string& joint_name : joint_names) {
+      joints.push_back(&plant_->GetJointByName(joint_name, model_instance_));
+      if (joints.back()->num_positions() != 1) {
+        Error(*node,
+              fmt::format(
+                  "Fixed tendon specified joint {} which has {} positions, but "
+                  "fixed tendons are only allowed to specify scalar joints.",
+                  joint_name, joints.back()->num_positions()));
+        return;
+      }
+    }
+
+    // MuJoCo's specification is ∑ᵢcoef[i]*q[i] = ∑ᵢ q0[i].
+    // Drake's coupler constraints use q[0] = gear_ratio*q[1] + offset.
+    const double gear_ratio = -coefficients[1] / coefficients[0];
+    const double offset = (joints[0]->default_positions()[0] +
+                           joints[1]->default_positions()[0]) /
+                          coefficients[0];
+    plant_->AddCouplerConstraint(*joints[0], *joints[1], gear_ratio, offset);
+
+    log()->info("added coupler constraint");
+    // Unsupported attributes are listed in the order from the MuJoCo docs:
+    // https://mujoco.readthedocs.io/en/stable/XMLreference.html#tendon-fixed
+    WarnUnsupportedAttribute(*node, "group");
+    WarnUnsupportedAttribute(*node, "limited");
+    WarnUnsupportedAttribute(*node, "range");
+    LogIgnoredAttribute(*node, "solreflimit");
+    LogIgnoredAttribute(*node, "solimplimit");
+    LogIgnoredAttribute(*node, "solreffriction");
+    LogIgnoredAttribute(*node, "solimpfriction");
+    WarnUnsupportedAttribute(*node, "frictionloss");
+    LogIgnoredAttribute(*node, "margin");
+    WarnUnsupportedAttribute(*node, "springlength");
+    WarnUnsupportedAttribute(*node, "stiffness");
+    WarnUnsupportedAttribute(*node, "damping");
+    WarnUnsupportedAttribute(*node, "user");
+  }
+
+  void ParseTendon(XMLElement* node) {
+    for (XMLElement* fixed_node = node->FirstChildElement("fixed"); fixed_node;
+         fixed_node = fixed_node->NextSiblingElement("fixed")) {
+      ParseFixedTendon(fixed_node);
+    }
+
+    // Unsupported elements are listed in the order from the MuJoCo docs:
+    // https://mujoco.readthedocs.io/en/stable/XMLreference.html#tendon
+    WarnUnsupportedElement(*node, "spatial");
+  }
+
   // Updates node by recursively replacing any <include> elements under it with
   // the children of the named file's root element.
   void ExpandIncludeTags(XMLElement* node,
@@ -1948,13 +2056,18 @@ class MujocoParser {
       ParseEquality(equality_node);
     }
 
+    // Parses the model's tendon elements.
+    for (XMLElement* tendon_node = node->FirstChildElement("tendon");
+         tendon_node; tendon_node = tendon_node->NextSiblingElement("tendon")) {
+      ParseTendon(tendon_node);
+    }
+
     // Unsupported elements are listed in the order from the MuJoCo docs:
     // https://mujoco.readthedocs.io/en/stable/XMLreference.html#mjcf-reference
     LogIgnoredElement(*node,
                       "size");  // specific memory allocation for MuJoCo solver.
     WarnUnsupportedElement(*node, "statistic");
     WarnUnsupportedElement(*node, "deformable");
-    WarnUnsupportedElement(*node, "tendon");
     WarnUnsupportedElement(*node, "sensor");
     WarnUnsupportedElement(*node, "keyframe");
     WarnUnsupportedElement(*node, "visual");

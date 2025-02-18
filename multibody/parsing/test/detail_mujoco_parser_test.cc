@@ -121,7 +121,7 @@ GTEST_TEST(MujocoParserExtraTest, Visualize) {
   systems::DiagramBuilder<double> builder;
   std::shared_ptr<geometry::Meshcat> meshcat =
       geometry::GetTestEnvironmentMeshcat();
-  auto [plant, scene_graph] = AddMultibodyPlantSceneGraph(&builder, 0.0);
+  auto [plant, scene_graph] = AddMultibodyPlantSceneGraph(&builder, 0.01);
 
   ParsingOptions options;
   PackageMap package_map;
@@ -1969,6 +1969,47 @@ TEST_F(MujocoParserTest, BadEqualityTest) {
   EXPECT_THAT(TakeError(), MatchesRegex(".*body2.*nonsense.*"));
   const auto constraint_ids = plant_.GetConstraintIds();
   EXPECT_EQ(constraint_ids.size(), 0);
+}
+
+TEST_F(MujocoParserTest, FixedTendonTest) {
+  std::string xml = R"""(
+<mujoco model="test">
+  <default class="mytendon">
+    <tendon coef="2.3"/>
+  </default>
+  <worldbody>
+    <body name="body1" pos="-1 0 0">
+      <geom type="box" size="0.1 0.2 0.3"/>
+      <joint name="joint1"type="hinge" ref="0.4"/>
+    </body>
+    <body name="body2" pos="1 0 0">
+      <geom type="box" size="0.1 0.2 0.3"/>
+      <joint name="joint2"type="hinge"/>
+    </body>
+  </worldbody>
+  <tendon>
+    <fixed class="mytendon">
+      <joint joint="joint1" coef="1.2"/>
+      <joint joint="joint2"/>
+    </fixed>
+  </tendon>
+</mujoco>
+)""";
+
+  AddModelFromString(xml, "test");
+  plant_.Finalize();
+
+  const auto constraint_ids = plant_.GetConstraintIds();
+  ASSERT_EQ(constraint_ids.size(), 1);
+  const auto& spec1 = plant_.get_coupler_constraint_specs(constraint_ids[0]);
+  EXPECT_EQ(spec1.joint0_index, plant_.GetJointByName("joint1").index());
+  EXPECT_EQ(spec1.joint1_index, plant_.GetJointByName("joint2").index());
+  EXPECT_NEAR(spec1.gear_ratio, -2.3 / 1.2, 1e-14);
+  EXPECT_NEAR(spec1.offset, 0.4 / 1.2, 1e-14);
+}
+
+TEST_F(MujocoParserTest, BadTendonTest) {
+  // TODO(russt): Add tests for tendon parsing errors.
 }
 
 }  // namespace
