@@ -76,8 +76,6 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
                      const SimulatorConfig& integrator_config)
       : LeafSystem<T>(SystemTypeTag<DiscreteTimeSystem>{}),
         continuous_system_(std::move(system)),
-        continuous_context_model_value_(
-            continuous_system_->CreateDefaultContext()),
         time_period_(time_period),
         time_offset_(time_offset),
         integrator_config_(integrator_config) {
@@ -101,18 +99,14 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
     this->set_name(name.empty() ? "discrete-time approximation"
                                 : "discrete-time approximated " + name);
 
-    // Create a cache entry for the continuous system context where we can
-    // safely modify it without a (non-thread-safe) mutable member.
-    continuous_context_cache_entry_ = &this->DeclareCacheEntry(
-        "continuous system context", *continuous_context_model_value_,
-        &DiscreteTimeSystem<T>::CopyAllSources,
-        {SystemBase::all_sources_ticket()});
-    // Another cache entry for the continuous system context, but this one does
-    // not copy the input port values.
-    continuous_context2_cache_entry_ = &this->DeclareCacheEntry(
-        "continuous system context2", *continuous_context_model_value_,
-        &DiscreteTimeSystem<T>::CopyAllSourcesExceptInput,
-        {SystemBase::all_sources_except_input_ports_ticket()});
+    std::unique_ptr<Simulator<T>> simulator =
+        std::make_unique<Simulator<T>>(*continuous_system_);
+    ApplySimulatorConfig(integrator_config_, simulator.get());
+    Value<Simulator<T>> simulator_value = Value<Simulator<T>>(simulator);
+    simulator_cache_entry_ =
+        &this->DeclareCacheEntry("simulator", simulator_value,
+                                 &DiscreteTimeSystem<T>::UpdateSimulatorContext,
+                                 {SystemBase::all_sources_ticket()});
 
     // Declare input ports.
     for (int i = 0; i < continuous_system_->num_input_ports(); ++i) {
@@ -136,10 +130,10 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
             port.get_name(), port.size(),
             [this, &port, input_dependent](const Context<T>& discrete_context,
                                            BasicVector<T>* out) {
+              const Simulator<T>& cached_simulator =
+                  simulator_cache_entry_->Eval<Simulator<T>>(discrete_context);
               const Context<T>& continuous_context =
-                  (input_dependent ? continuous_context_cache_entry_
-                                   : continuous_context2_cache_entry_)
-                      ->template Eval<Context<T>>(discrete_context);
+                  cached_simulator.get_context();
               out->SetFromVector(port.Eval(continuous_context));
             },
             prerequisites_of_calc);
@@ -151,10 +145,10 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
             },
             [this, &port, input_dependent](const Context<T>& discrete_context,
                                            AbstractValue* out) {
+              const Simulator<T>& cached_simulator =
+                  simulator_cache_entry_->Eval<Simulator<T>>(discrete_context);
               const Context<T>& continuous_context =
-                  (input_dependent ? continuous_context_cache_entry_
-                                   : continuous_context2_cache_entry_)
-                      ->template Eval<Context<T>>(discrete_context);
+                  cached_simulator.get_context();
               port.Calc(continuous_context, out);
             },
             prerequisites_of_calc);
@@ -162,16 +156,17 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
     }
 
     // Declare parameters.
+    const Context<T>& continuous_context = simulator->get_context();
     for (int i = 0;
-         i < continuous_context_model_value_->num_numeric_parameter_groups();
+         i < continuous_context.num_numeric_parameter_groups();
          ++i) {
       this->DeclareNumericParameter(
-          continuous_context_model_value_->get_numeric_parameter(i));
+          continuous_context.get_numeric_parameter(i));
     }
     for (int i = 0;
-         i < continuous_context_model_value_->num_abstract_parameters(); ++i) {
+         i < continuous_context.num_abstract_parameters(); ++i) {
       this->DeclareAbstractParameter(
-          continuous_context_model_value_->get_abstract_parameter(i));
+          continuous_context.get_abstract_parameter(i));
     }
 
     // Declare state.
@@ -182,64 +177,39 @@ class DiscreteTimeSystem final : public LeafSystem<T> {
 
   void DiscreteUpdate(const Context<T>& discrete_context,
                       DiscreteValues<T>* out) const {
-    // TODO(wei-chen): Make the simulator/integrator a cache variable.
-    Simulator<T> simulator(*continuous_system_);
-    ApplySimulatorConfig(integrator_config_, &simulator);
-    auto& integrator = simulator.get_mutable_integrator();
+    const Simulator<T>& simulator =
+        simulator_cache_entry_->Eval<Simulator<T>>(discrete_context);
 
-    // Ensure that the continuous system context is up-to-date.
-    continuous_context_cache_entry_->template Eval<Context<T>>(
-        discrete_context);
-    auto& cache_entry_value =
-        continuous_context_cache_entry_->get_mutable_cache_entry_value(
-            discrete_context);
-    DRAKE_ASSERT(!cache_entry_value.is_out_of_date());
+    simulator.AdvanceTo(discrete_context.get_time() + time_period_);
 
-    // We allow the integrator to modify the continuous system context in place.
-    // This is fine because (a) we mark the cache entry as out-of-date, and
-    cache_entry_value.mark_out_of_date();
-    auto& continuous_context =
-        cache_entry_value.template GetMutableValueOrThrow<Context<T>>();
-    integrator.reset_context(&continuous_context);
-    integrator.Initialize();
-    integrator.IntegrateWithMultipleStepsToTime(continuous_context.get_time() +
-                                                time_period_);
-
-    // (b) after updating `DiscreteValues<T>* out`,
-    // CopyDiscreteContextToContinuousContext() will be invoked next time
-    // continuous_context_cache_entry_->Eval() is called anyway.
     out->get_mutable_vector().SetFromVector(
-        continuous_context.get_continuous_state_vector().CopyToVector());
+        simulator.get_context().get_continuous_state_vector().CopyToVector());
   }
 
-  void CopyAllSourcesExceptInput(const Context<T>& from_discrete_context,
-                                 Context<T>* to_continuous_context) const {
+  void UpdateSimulatorContext(const Context<T>& from_discrete_context,
+                      Simulator<T>* simulator) const {
+    auto continuous_context = simulator->get_mutable_context();
     // Copy time.
-    to_continuous_context->SetTime(from_discrete_context.get_time());
+    continuous_context->SetTime(from_discrete_context.get_time());
     // Copy state.
-    to_continuous_context->SetContinuousState(
+    continuous_context->SetContinuousState(
         from_discrete_context.get_discrete_state_vector().value());
     // Copy parameters.
-    to_continuous_context->get_mutable_parameters().SetFrom(
+    continuous_context->get_mutable_parameters().SetFrom(
         from_discrete_context.get_parameters());
     // Copy accuracy.
-    to_continuous_context->SetAccuracy(from_discrete_context.get_accuracy());
-  }
-
-  void CopyAllSources(const Context<T>& from_discrete_context,
-                      Context<T>* to_continuous_context) const {
-    CopyAllSourcesExceptInput(from_discrete_context, to_continuous_context);
-    // Copy fixed input port values.
+    continuous_context->SetAccuracy(from_discrete_context.get_accuracy());
+    // Copy input port values.
     for (int i = 0; i < continuous_system_->num_input_ports(); ++i) {
-      to_continuous_context->FixInputPort(
+      continuous_context->FixInputPort(
           i, *this->EvalAbstractInput(from_discrete_context, i));
     }
   }
 
   const std::unique_ptr<const System<T>> continuous_system_;
-  const std::unique_ptr<const Context<T>> continuous_context_model_value_;
-  const CacheEntry* continuous_context_cache_entry_;
-  const CacheEntry* continuous_context2_cache_entry_;
+  const CacheEntry*
+      simulator_cache_entry_;  // This holds "state" in the owned (continuous)
+                               // context and in the integrator.
   const double time_period_;
   const double time_offset_;
   const SimulatorConfig integrator_config_;
