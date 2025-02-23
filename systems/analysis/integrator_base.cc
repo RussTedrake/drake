@@ -4,6 +4,13 @@ namespace drake {
 namespace systems {
 
 template <class T>
+std::unique_ptr<IntegratorBase<T>> IntegratorBase<T>::DoClone() const {
+  throw std::runtime_error(
+      "This integrator does not (yet) support Clone(). Derived classes must "
+      "implement DoClone().");
+}
+
+template <class T>
 bool IntegratorBase<T>::StepOnceErrorControlledAtMost(const T& h_max) {
   using std::isnan;
   using std::min;

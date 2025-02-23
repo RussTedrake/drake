@@ -52,6 +52,8 @@ class ExplicitEulerIntegrator final : public IntegratorBase<T> {
   int get_error_estimate_order() const override { return 0; }
 
  private:
+  std::unique_ptr<IntegratorBase<T>> DoClone() const override;
+
   bool DoStep(const T& h) override;
 };
 

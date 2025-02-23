@@ -174,6 +174,10 @@ class IntegratorBase {
 
   virtual ~IntegratorBase() = default;
 
+  std::unique_ptr<IntegratorBase<T>> Clone() const {
+    return DoClone();
+  }
+
   /**
    @anchor integrator-accuracy
    @name Methods for getting and setting integrator accuracy
@@ -1305,6 +1309,8 @@ class IntegratorBase {
   }
 
  protected:
+  virtual std::unique_ptr<IntegratorBase<T>> DoClone() const;
+
   /**
    Resets any statistics particular to a specific integrator. The default
    implementation of this function does nothing. If your integrator
