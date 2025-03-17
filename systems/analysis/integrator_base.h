@@ -1025,13 +1025,16 @@ class IntegratorBase {
    optimization, for which the integration process should be _consistent_: it
    should execute the same sequence of arithmetic operations for all values
    of the nonlinear programming variables. In keeping with the naming
-   semantics of this function, error controlled integration is not supported
-   (though error estimates will be computed for integrators that support that
-   feature), which is a minimal requirement for "consistency".
+   semantics of this function, error controlled integration is not supported,
+   which is a minimal requirement for "consistency". In order to provide a const
+   interface (with no hidden state), this method also disables any bookkeeping
+   statistics.
    @warning Users should simulate systems using `Simulator::AdvanceTo()` in
             place of this function (which was created for off-simulation
             purposes), generally.
    @param t_target The current or future time to integrate to.
+   @param context The context to integrate; it must be a valid context for
+                  get_system().
    @throws std::exception If the integrator has not been initialized or
                           `t_target` is in the past or the integrator
                           is not operating in fixed step mode.
@@ -1051,11 +1054,12 @@ class IntegratorBase {
    - Takes only a single step forward.
    */
   [[nodiscard]] bool IntegrateWithSingleFixedStepToTime(
-      const T& t_target) const {
+      const T& t_target, Context<T>* context) const {
+    system_->ValidateContext(context);
     using std::max;
     using std::abs;
 
-    const T h = t_target - context_->get_time();
+    const T h = t_target - context->get_time();
     if (scalar_predicate<T>::is_bool && h < 0) {
       throw std::logic_error("IntegrateWithSingleFixedStepToTime() called with "
                              "a negative step size.");
@@ -1064,23 +1068,33 @@ class IntegratorBase {
       throw std::logic_error("IntegrateWithSingleFixedStepToTime() requires "
                              "fixed stepping.");
 
-    if (!DoStepConst(h, context_))
+    if (!DoStepConst(h, context))
       return false;
-
-//    UpdateStepStatistics(h);
 
     if constexpr (scalar_predicate<T>::is_bool) {
       // Correct any round-off error that has occurred. Formula below requires
       // that time be non-negative.
-      DRAKE_DEMAND(context_->get_time() >= 0);
+      DRAKE_DEMAND(context->get_time() >= 0);
       const double tol = 10 * std::numeric_limits<double>::epsilon() *
-          ExtractDoubleOrThrow(max(1.0, max(t_target, context_->get_time())));
-      DRAKE_DEMAND(abs(context_->get_time() - t_target) < tol);
+          ExtractDoubleOrThrow(max(1.0, max(t_target, context->get_time())));
+      DRAKE_DEMAND(abs(context->get_time() - t_target) < tol);
     }
 
-    context_->SetTime(t_target);
+    context->SetTime(t_target);
 
     return true;
+  }
+
+  /**
+   An overload for IntegrateWithSingleFixedStepToTime that uses the
+   internally-maintained context. It bookkeeps step statistics only.
+   */
+  [[nodiscard]] bool IntegrateWithSingleFixedStepToTime(
+      const T& t_target) {
+    bool result = IntegrateWithSingleFixedStepToTime(t_target, context_);
+    const T h = t_target - context_->get_time();
+    UpdateStepStatistics(h);
+    return result;
   }
 
   /**

@@ -149,7 +149,8 @@ bool RungeKutta3Integrator<T>::DoStep(const T& h) {
 }
 
 template <class T>
-bool RungeKutta3Integrator<T>::DoStepConst(const T& h, Context<T>* context) const {
+bool RungeKutta3Integrator<T>::DoStepConst(const T& h,
+                                           Context<T>* context) const {
   using std::abs;
   const T t0 = context->get_time();
   const T t1 = t0 + h;
